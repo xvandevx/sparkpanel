@@ -37,13 +37,17 @@ to any frontend through a REST API, or let AI assistants work with it over MCP.
 Requires Docker with Compose.
 
 ```bash
-git clone https://github.com/xvandevx/sparkpanel.git
-cd sparkpanel/webSite/headless
-cp .env.example .env        # set every value: openssl rand -hex 32
-docker compose up -d --build
+mkdir sparkpanel && cd sparkpanel
+curl -fsSLO https://github.com/xvandevx/sparkpanel/releases/latest/download/docker-compose.yml
+curl -fsSL https://github.com/xvandevx/sparkpanel/releases/latest/download/env.example -o .env
+# set every value in .env: openssl rand -hex 32
+docker compose up -d
 ```
 
 Open http://localhost:3000 — the first visit creates the main administrator.
+Update: `docker compose pull && docker compose up -d`. The image is
+`ghcr.io/xvandevx/sparkpanel` (`:latest`, `:1`, `:1.4.0`); pin a version with
+`SPARKPANEL_VERSION` in `.env`.
 
 One image runs the panel and the API on a single port; Postgres and MinIO run next to
 it. Put any reverse proxy (Caddy, Traefik, nginx) in front for HTTPS.

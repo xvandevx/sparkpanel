@@ -3,19 +3,22 @@
 # Пример для того, кто ставит панель себе. Рядом — .env (шаблон .env.example).
 #
 #   docker compose up -d        → http://localhost:3000
+#   docker compose pull && docker compose up -d   — обновить до свежей версии
 #
-# Пока образ не публикуется, его собирают сами (`build` ниже). HTTPS — забота
-# прокси перед панелью (Caddy, Traefik, nginx): она отдаёт и /api, и страницы
-# с одного порта, прокси нужно провести только его.
+# Образ — выпущенный в GHCR; версия — SPARKPANEL_VERSION в .env (по умолчанию
+# latest). Собрать из исходников — раскомментировать `build` в клоне репозитория
+# и `docker compose up -d --build`. HTTPS — забота прокси перед панелью (Caddy,
+# Traefik, nginx): она отдаёт и /api, и страницы с одного порта, прокси нужно
+# провести только его.
 
 name: sparkpanel
 
 services:
   sparkpanel:
-    build:
-      context: ..
-      dockerfile: headless/Dockerfile
-    image: sparkpanel:dev
+    image: ghcr.io/xvandevx/sparkpanel:${SPARKPANEL_VERSION:-latest}
+    # build:
+    #   context: ..
+    #   dockerfile: headless/Dockerfile
     ports:
       - "${PORT:-3000}:3000"
     environment:

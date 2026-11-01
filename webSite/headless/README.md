@@ -52,15 +52,25 @@
 Локально ничего не поменялось: `next dev` (:3401) за nginx (:3400), как раньше.
 Без `NEXT_OUTPUT` конфиг Next прежний, без `FRONTEND_DIR` бэкенд статику не отдаёт.
 
-## Собрать и запустить
+## Запустить
+
+Выпущенный образ — `ghcr.io/xvandevx/sparkpanel`. Клонировать репозиторий не нужно:
+`docker-compose.yml` и шаблон секретов лежат в каждом выпуске на GitHub.
 
 ```bash
-cd webSite/headless
-cp .env.example .env      # и заменить значения
-docker compose up -d --build
+mkdir sparkpanel && cd sparkpanel
+curl -fsSLO https://github.com/xvandevx/sparkpanel/releases/latest/download/docker-compose.yml
+curl -fsSL https://github.com/xvandevx/sparkpanel/releases/latest/download/env.example -o .env
+# заменить в .env значения
+docker compose up -d
 ```
 
 Панель — `http://localhost:3000`. Первым входом заводится главный администратор.
+Обновить — `docker compose pull && docker compose up -d`. Версия — `SPARKPANEL_VERSION`
+в `.env`: `1.4.0` — ровно она, `1` — свежая 1.x, не задана — `latest`.
+
+Из исходников — в клоне репозитория раскомментировать `build` в `docker-compose.yml`,
+`cp .env.example .env` и `docker compose up -d --build`.
 
 ## Переменные
 
@@ -95,14 +105,14 @@ docker compose up -d --build
 - [x] База одной строкой `DATABASE_URL` (вместо пяти `POSTGRES_*`) и внешний адрес
   панели `PUBLIC_URL` — переменные ниже
 - [x] Файлы встроенного хранилища открываются: `/uploads/<ключ>` отдаёт панель из MinIO
+- [x] Сборка образа в CI с версиями (`:1.4.0`, `:1`, `:latest`), GHCR + Docker Hub,
+  образы для amd64 и arm64, GitHub Release с заметками — «Как выпустить версию» ниже
 
 Не готово — образ собирается, но отдавать его людям рано:
 
 - [ ] **`PRIVATE_KEY` обязателен** — сервер без него не стартует. Нужно: не задан —
   сгенерировать при первом старте и сохранить в томе.
 - [ ] `/api/health` и `HEALTHCHECK` в образе.
-- [ ] Сборка образа в CI с версиями (`:1.4.0`, `:1`, `:latest`), Docker Hub + GHCR,
-  образы для amd64 и arm64.
 - [ ] Права по ролям: роли пока справочник (`docs/users.md`). Все вошедшие правят
   контент на равных, кроме разделов только для главного администратора; кто что
   поменял, видно в журнале, вернуть — из резервной копии.
@@ -133,5 +143,51 @@ docker compose up -d --build
    первый, кто откроет `/admin` (поставил — сразу зайди).
 
 Репозиторий публичный — `github.com/xvandevx/sparkpanel`, один на фронтенд и бэкенд, лицензия — BSL 1.1
-([`LICENSE`](../../LICENSE)). Образ выпускает `.github/workflows/image.yml` только по тегу
-`v*.*.*` (или кнопкой «Run workflow» — собрать без выпуска) в GHCR (`ghcr.io/xvandevx/sparkpanel`), Docker Hub — вторым адресом позже.
+([`LICENSE`](../../LICENSE)). Образ выпускается только по тегу версии — см. «Как выпустить версию» ниже.
+
+## Как выпустить версию
+
+Образ выпускает `.github/workflows/image.yml` — **только по тегу** `v*.*.*`. Push в `main`
+образ не трогает; кнопка «Run workflow» во вкладке Actions собирает образ для проверки
+и ничего не выпускает.
+
+Версия живёт **в одном месте — в теге**. `version` в `package.json` фронтенда и бэкенда
+не используются и не правятся; в панели номер версии не показывается, он есть в метке
+образа `org.opencontainers.image.version` (`docker inspect`).
+
+1. Убедиться, что `main` в порядке, и выбрать номер по [semver](https://semver.org/lang/ru/):
+   есть `feat!`/`BREAKING CHANGE` — старшая цифра, есть `feat` — средняя, иначе — младшая.
+   Пока версия `0.x`, ломающие изменения поднимают среднюю.
+2. Поставить тег и отправить его:
+   ```bash
+   git tag v1.4.0
+   git push origin v1.4.0
+   ```
+   Проба перед выпуском — пре-релиз: `v1.4.0-rc.1`.
+3. Минут через 15–20 (две архитектуры) появятся:
+   - образ `ghcr.io/xvandevx/sparkpanel` с тегами `:1.4.0`, `:1.4`, `:1`, `:latest`
+     (у `0.x` — без `:0`); у пре-релиза — только `:1.4.0-rc.1`, `latest` не двигается;
+   - то же на Docker Hub, если он подключён (ниже);
+   - GitHub Release `v1.4.0`: заметки — заголовки коммитов с прошлой стабильной
+     версии по типам (ломающие, `feat`, `fix`, `perf`, остальное), к нему приложены
+     `docker-compose.yml` и `env.example` — их качает быстрый старт.
+     Пре-релиз помечается пре-релизом, и `releases/latest` на него не указывает.
+
+Неудачный выпуск: удалить Release и тег (`git push origin :v1.4.0`), исправить, выпустить
+следующий номер — переиспользовать номер не стоит, его образ уже могли скачать.
+
+**Один раз после первого выпуска:** GitHub → профиль → Packages → `sparkpanel` →
+Package settings → Change visibility → Public. Новый пакет GHCR закрыт, и без этого
+`docker compose pull` у чужих людей просит логин.
+
+**Docker Hub** — второй адрес, включается настройками репозитория (Settings → Secrets
+and variables → Actions); пока их нет, выпуск идёт в один GHCR без ошибок:
+
+| Где | Имя | Значение |
+|-----|-----|----------|
+| Variables | `DOCKERHUB_NAMESPACE` | аккаунт или организация на Docker Hub: образ — `docker.io/<namespace>/sparkpanel` |
+| Secrets | `DOCKERHUB_USERNAME` | логин Docker Hub |
+| Secrets | `DOCKERHUB_TOKEN` | Personal Access Token (Docker Hub → Account settings → Personal access tokens) с правами Read, Write, Delete — Delete нужен, чтобы обновлять описание репозитория |
+
+Описание на Docker Hub выпуск берёт из `README.md` репозитория. Не обновилось
+(например, у токена нет Delete) — образ всё равно выпущен, шаг помечен предупреждением.

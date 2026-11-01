@@ -38,13 +38,17 @@
 Нужен Docker с Compose.
 
 ```bash
-git clone https://github.com/xvandevx/sparkpanel.git
-cd sparkpanel/webSite/headless
-cp .env.example .env        # заменить все значения: openssl rand -hex 32
-docker compose up -d --build
+mkdir sparkpanel && cd sparkpanel
+curl -fsSLO https://github.com/xvandevx/sparkpanel/releases/latest/download/docker-compose.yml
+curl -fsSL https://github.com/xvandevx/sparkpanel/releases/latest/download/env.example -o .env
+# заменить в .env все значения: openssl rand -hex 32
+docker compose up -d
 ```
 
 Откройте http://localhost:3000 — первым входом заводится главный администратор.
+Обновить: `docker compose pull && docker compose up -d`. Образ —
+`ghcr.io/xvandevx/sparkpanel` (`:latest`, `:1`, `:1.4.0`); закрепить версию —
+`SPARKPANEL_VERSION` в `.env`.
 
 Панель и API — один образ на одном порту, рядом Postgres и MinIO. Для HTTPS поставьте
 перед панелью любой прокси (Caddy, Traefik, nginx).
