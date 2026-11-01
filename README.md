@@ -6,8 +6,8 @@ to any frontend through a REST API, or let AI assistants work with it over MCP.
 
 [Русская версия](README.ru.md)
 
-> **Early preview.** SparkPanel works and is used in development, but it is not
-> production-ready yet: see [Status](#status) before installing it for real.
+> **Early preview.** APIs and settings may change between versions — see the
+> [Roadmap](#roadmap).
 
 ## Why SparkPanel
 
@@ -49,14 +49,13 @@ One image runs the panel and the API on a single port; Postgres and MinIO run ne
 it. Put any reverse proxy (Caddy, Traefik, nginx) in front for HTTPS.
 Details: [webSite/headless/README.md](webSite/headless/README.md).
 
-## Status
+## Roadmap
 
-Not ready for production yet:
-
-- Roles are a directory only — permissions are not enforced, every signed-in user can edit everything.
-- Files from the built-in storage are not served by the standalone image yet.
-- The first-run setup is open to whoever opens the panel first.
-- No webhooks on publish yet.
+- Permissions by role
+- Serving built-in storage files from the standalone image
+- Protected first-run setup
+- Webhooks on publish
+- English UI
 
 The full list and the plan are in [webSite/headless/README.md](webSite/headless/README.md).
 
