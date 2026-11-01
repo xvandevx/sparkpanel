@@ -61,11 +61,10 @@ const pageProperties = (properties: ApiPropertyDef[]) =>
 const SORT_VALUE = '$sort';
 
 /**
- * Внешнее API: читает списки панели теми же сервисами, что и редактор
+ * Внешнее API, чтение: читает списки панели теми же сервисами, что и редактор
  * (записи — у `RecordsService`, свойства — у настроек, значения — у `values/`),
- * отбирает общим `pageRecords` и отдаёт в виде для сайта. Пишет только
- * отметку «последний запрос» у ключа — в гарде. Данные сайта общие — ключ
- * открывает их все, чей бы он ни был.
+ * отбирает общим `pageRecords` и отдаёт в виде для сайта. Данные сайта
+ * общие — ключ читает их все, чей бы он ни был. Запись — `write/`.
  */
 @Injectable()
 export class ExternalApiService {
@@ -146,6 +145,16 @@ export class ExternalApiService {
     return this.one(loaded, row, origin, expand);
   }
 
+  /** Запись по внешнему ID: номер ищется по индексу, а не перебором списка. */
+  async itemByExternalId(path: string, externalId: string, query: ExternalItemQueryDto, origin: string) {
+    const list = await this.listAt(path);
+    const recordId = await this.values.recordIdByExternalId(list.listKey, externalId.trim());
+    if (recordId === null) throw new NotFoundException('Запись не найдена');
+    const loaded = await this.load(list, query.domain);
+    const expand = await this.expandOf(query.expand, loaded.properties);
+    return this.one(loaded, loaded.rows.find((row) => String(row.id) === recordId), origin, expand);
+  }
+
   /** Страница по полному адресу — то, что нужно роутеру сайта. Слэш в конце не важен. */
   async pageByUrl(url: string, domain: string | undefined, origin: string) {
     const loaded = await this.load(PAGES_API, domain);
@@ -218,7 +227,8 @@ export class ExternalApiService {
     return buildSpec({ serverUrl: `${origin}/api/v1`, siteName: site.siteName, lists: specLists });
   }
 
-  private async listAt(path: string): Promise<ApiList> {
+  /** Список API по адресу; нет такого — 404. */
+  async listAt(path: string): Promise<ApiList> {
     const list = (await this.lists()).find((item) => item.path === path);
     if (!list) throw new NotFoundException(`Нет списка ${path}`);
     return list;

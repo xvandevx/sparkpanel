@@ -408,7 +408,11 @@ Swagger на `/api/docs`.
   не отдаёт ни один маршрут, в журнале — `••••••`; сервер читает такие значения
   `PropertyValuesService.codeValues`. **Свойство из внешнего источника** (`isExternal`,
   «Внешний источник») в карточке закрыто, а значения из панели (`PATCH …/values` без `via`
-  в JWT) сервер не принимает — пишет их только внешняя система через MCP. **Проверку значений** своего списка раздел добавляет
+  в JWT) сервер не принимает — пишет их только внешняя система через внешнее API или MCP.
+  **Внешний ID записи** (`externalId`, номер в системе-источнике) — у записи любого списка,
+  колонкой общей строки `infoblock_records`, уникален в списке (частичный индекс); задаёт
+  его тоже только интеграция (`PATCH …/values` с `via`), наружу его добавляет
+  `RecordsService.rows`, карточка показывает его на просмотр. **Проверку значений** своего списка раздел добавляет
   `PropertyValuesService.registerCheck` — она идёт в транзакции сохранения (адрес страницы,
   подключение хранилища).
   **Системные свойства** (`isBlocked`: через API не меняются и не удаляются) перечислены
@@ -455,28 +459,37 @@ Swagger на `/api/docs`.
   (`json_populate_recordset`, только колонки, что есть и в копии, и в базе), счётчики
   номеров за последний, потом сверка системных свойств. Не легло — 400, база прежняя.
   Подробности — [`docs/backups.md`](docs/backups.md#копия-всего-сайта).
-- **Внешнее API:** модуль `external-api/` — `/api/v1` для сайта по заголовку `X-Api-Key`
+- **Внешнее API:** модуль `external-api/` — `/api/v1` для сайта и интеграций по заголовку `X-Api-Key`
   (маршруты `@Public()` + `ApiKeyGuard`, в Swagger панели их нет): у каждого списка
-  `items`, `items/{idOrCode}`, `properties`, `facets`; списки — `/pages`,
+  `items`, `items/{idOrCode}`, `items/external/{externalId}`, `properties`, `facets`; списки — `/pages`,
   `/contents/{код типа}`, `/catalog/products`, `/catalog/categories`, `/domains`
   (`api-lists.ts`). Свойства — объектом по коду, «Список» — кодом варианта, скрытые —
   никогда; отбор — общий `pageRecords`, `filter[код]` переводит `external-values.ts`.
   **Спецификацию OpenAPI сервер собирает из настроек списков** (`openapi-spec.ts`,
   `/api/v1/openapi.json`) — руками документацию не пишем. Ключи — `api_keys` (хэш SHA-256,
-  ключ виден один раз), читают данные создателя (`userId`); управляет ими root
-  (`/api/external-api`, `RootOnlyGuard` из `common/`). Подробности — [`docs/external-api.md`](docs/external-api.md).
+  ключ виден один раз); управляет ими root (`/api/external-api`, `RootOnlyGuard` из `common/`).
+  **Запись** (`write/`): права ключа задаются при создании и не меняются — `isWritable`
+  и `writeLists` (null — все списки), иначе 403; `POST`/`PATCH`/`DELETE …/items`, upsert
+  `PUT …/items/external/{externalId}` и пакет `POST …/items/batch` (до 500, ошибка одной
+  записи не держит остальные). Свойства — по кодам, «Список» — номером или кодом, привязка —
+  номером, кодом или `{ externalId }`. Пишет, как MCP, **маршрутами панели** через
+  `PanelClient` (`common/`) от имени создателя ключа с `via` «API «ключ»»: проверки и журнал —
+  панели; поля и свойства — две транзакции, не легли свойства — запись откатывается вручную.
+  Запись по номеру, коду и внешнему ID ищется запросом по индексу (`record-lookup.service.ts`).
+  Подробности — [`docs/external-api.md`](docs/external-api.md).
 - **MCP:** модуль `mcp/` — сервер MCP для ИИ-ассистентов, `POST /api/mcp` (Streamable HTTP
   без сессий, JSON-RPC написан руками, без SDK), по личному токену `spm_…` в
   `Authorization: Bearer` (`@Public()` + `McpTokenGuard`). Ассистент работает **от имени
   владельца токена, со всеми его правами**: инструменты (`mcp-tools.ts`) ходят **в маршруты
-  панели**, а не в сервисы разделов — `PanelClient` выпускает JWT владельца на минуту и
+  панели**, а не в сервисы разделов — `PanelClient` (`common/`) выпускает JWT владельца на минуту и
   вызывает `/api/…` на своём порту, поэтому гарды, DTO, правила разделов и журнал те же,
   что в браузере. В этом JWT — `via` («MCP «токен»»): `historyAuthor` несёт его дальше,
   и история подписывает правку «Иван · MCP «…»». Черновики поддержаны: запись отдаётся
-  с `draft` рядом, `save_record` пишет в `draft` или `published`. Списки MCP — `mcp-lists.ts`
+  с `draft` рядом, `save_record` пишет в `draft` или `published` (внешний ID — сразу,
+  мимо черновика). Списки MCP — `mcp-lists.ts`
   (пользователей, ролей, хранилищ и форм нет). Токены — `mcp_tokens`, журнал вызовов —
   `mcp_calls` (30 дней, всё, кроме полей отбора, — JSON `details`); root видит все, остальные —
-  свои (`/api/mcp/tokens`, `/api/mcp/calls`). Тело `/api/mcp` — до 25 МБ (`main.ts`: свой
+  свои (`/api/mcp/tokens`, `/api/mcp/calls`). Тело `/api/mcp` и `/api/v1` — до 25 МБ (`main.ts`: свой
   JSON-парсер отменяет парсер Nest, поэтому общий там же поставлен явно).
   Подробности — [`docs/mcp.md`](docs/mcp.md).
 - **Грабли JWT:** `JwtModule` подключается через `registerAsync` + `ConfigService`. Синхронный
@@ -615,7 +628,8 @@ pages/ → components/ → logic/ → redux/ → api/ → src/generated/
   ([`docs/backups.md`](docs/backups.md#копия-всего-сайта)).
 
 - **API.** `components/settings/api/` + `logic/externalApi/` — «Настройки → API»
-  (`/admin/settings/api`, только root): вкладка «Доступ» — адрес, правила и ключи (полный
+  (`/admin/settings/api`, только root): вкладка «Доступ» — адрес, правила и ключи с правами
+  (чтение / запись во все или отмеченные списки — выбираются при создании; полный
   ключ — один раз в окне создания), «Документация» — спецификация с сервера во встроенном
   Scalar (`@scalar/api-reference-react`, только в браузере, стили — его `style.css`).
   Подробности — [`docs/external-api.md`](docs/external-api.md).

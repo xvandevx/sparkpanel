@@ -3,8 +3,8 @@
  * ошибки. Сами правила остаются чистыми функциями в logic/<feature>/.
  */
 export const asRule =
-  (check: (value: string) => string | null) =>
-  (_rule: unknown, value: string): Promise<void> => {
+  <T = string>(check: (value: T) => string | null) =>
+  (_rule: unknown, value: T): Promise<void> => {
     const message = check(value);
     return message ? Promise.reject(new Error(message)) : Promise.resolve();
   };

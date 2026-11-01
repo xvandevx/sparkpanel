@@ -584,11 +584,23 @@ export class BackupsService {
     const records = copy.records.filter((row) =>
       taken.has(String(row.recordKey)),
     );
+    // Внешний ID уникален в списке: тот, что за время после копии заняла
+    // оставшаяся запись (интеграция завела её заново), вернувшейся не достаётся
+    const keptExternal = await this.recordsRepo.findAll({
+      attributes: ['externalId'],
+      where: { settingsId, externalId: { [Op.ne]: null } },
+      transaction,
+    });
+    const busy = new Set(keptExternal.map((row) => row.externalId));
     const created = await this.recordsRepo.bulkCreate(
       records.map((row) => ({
         settingsId,
         recordKey: String(row.recordKey),
         parentId: (row.parentId as string | null) ?? null,
+        externalId:
+          typeof row.externalId === 'string' && !busy.has(row.externalId)
+            ? row.externalId
+            : null,
       })),
       { transaction, returning: true },
     );

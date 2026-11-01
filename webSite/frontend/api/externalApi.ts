@@ -1,4 +1,4 @@
-import { api, ApiKeyDto, CreatedApiKeyDto } from '../src/api/client';
+import { api, ApiKeyDto, ApiListDto, CreateApiKeyDto, CreatedApiKeyDto } from '../src/api/client';
 
 /**
  * Внешнее API глазами панели (`/api/external-api`): ключи доступа
@@ -12,8 +12,14 @@ export const fetchApiKeys = async (): Promise<ApiKeyDto[]> => {
 };
 
 /** Ответ — единственный раз, когда ключ виден целиком. */
-export const createApiKey = async (name: string): Promise<CreatedApiKeyDto> => {
-  const { data } = await api.externalApi.apiKeysControllerCreateKey({ name });
+export const createApiKey = async (dto: CreateApiKeyDto): Promise<CreatedApiKeyDto> => {
+  const { data } = await api.externalApi.apiKeysControllerCreateKey(dto);
+  return data;
+};
+
+/** Списки внешнего API — куда ключ может писать. */
+export const fetchApiLists = async (): Promise<ApiListDto[]> => {
+  const { data } = await api.externalApi.apiKeysControllerLists();
   return data;
 };
 

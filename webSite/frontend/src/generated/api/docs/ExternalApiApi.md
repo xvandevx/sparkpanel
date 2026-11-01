@@ -6,6 +6,7 @@ All URIs are relative to *http://localhost*
 |------------- | ------------- | -------------|
 |[**apiKeysControllerCreateKey**](#apikeyscontrollercreatekey) | **POST** /api/external-api/keys | Создать ключ. Ответ — единственный раз, когда ключ виден целиком|
 |[**apiKeysControllerFindKeys**](#apikeyscontrollerfindkeys) | **GET** /api/external-api/keys | Ключи внешнего API, новые сверху|
+|[**apiKeysControllerLists**](#apikeyscontrollerlists) | **GET** /api/external-api/lists | Списки внешнего API — куда ключ может писать|
 |[**apiKeysControllerRemoveKey**](#apikeyscontrollerremovekey) | **DELETE** /api/external-api/keys/{id} | Отозвать ключ — он сразу перестаёт работать|
 |[**apiKeysControllerSpec**](#apikeyscontrollerspec) | **GET** /api/external-api/openapi | Спецификация внешнего API (OpenAPI 3.1) — та же, что по ключу из /api/v1/openapi.json|
 
@@ -85,6 +86,49 @@ This endpoint does not have any parameters.
 ### Return type
 
 **Array<ApiKeyDto>**
+
+### Authorization
+
+[JWT-auth](../README.md#JWT-auth)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+|**200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **apiKeysControllerLists**
+> Array<ApiListDto> apiKeysControllerLists()
+
+
+### Example
+
+```typescript
+import {
+    ExternalApiApi,
+    Configuration
+} from './api';
+
+const configuration = new Configuration();
+const apiInstance = new ExternalApiApi(configuration);
+
+const { status, data } = await apiInstance.apiKeysControllerLists();
+```
+
+### Parameters
+This endpoint does not have any parameters.
+
+
+### Return type
+
+**Array<ApiListDto>**
 
 ### Authorization
 

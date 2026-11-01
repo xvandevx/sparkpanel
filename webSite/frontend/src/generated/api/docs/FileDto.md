@@ -10,7 +10,7 @@ Name | Type | Description | Notes
 **propertyId** | **number** | Свойство, через которое загружен файл; null — файл в разделе | [default to undefined]
 **name** | **string** | Имя файла | [default to undefined]
 **code** | **string** | Код файла — имя в адресе, латиницей, с расширением; адрес — папки из номера плюс код | [default to undefined]
-**url** | **string** | Адрес файла — собран из ключа объекта и хранилища; у встроенного относительный, отдаёт nginx | [default to undefined]
+**url** | **string** | Адрес файла — собран из ключа объекта и хранилища; у встроенного относительный, отдаёт сама панель | [default to undefined]
 **mimeType** | **string** |  | [default to undefined]
 **isImage** | **boolean** | Файл — изображение (по MIME-типу) | [default to undefined]
 **size** | **number** | Размер в байтах | [default to undefined]

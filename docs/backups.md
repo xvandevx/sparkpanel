@@ -45,7 +45,7 @@
 | `settings` | правила записей списка: `useCode`, `codeRequired`, `codeUnique`, `maxDepth`, `isHistoryEnabled`, `isDraftEnabled`. Имени и кода нет — их задаёт раздел |
 | `tabs`, `properties`, `options`, `filters` | вкладки, свойства, варианты «Списка», поля фильтра |
 | `rows` | записи из таблицы раздела (`infoblock_pages`, `users`…) — все поля, у пользователей и хэш пароля |
-| `records`, `values` | `infoblock_records` и `infoblock_values` — значения свойств записей |
+| `records`, `values` | `infoblock_records` и `infoblock_values` — значения свойств записей; у строк записей — родитель в дереве списка и внешний ID. Внешний ID, который с момента копии заняла оставшаяся запись (интеграция завела её заново), вернувшейся записи не достаётся |
 | `drafts` | черновики записей |
 
 Вида таблицы (`infoblock_settings_columns`) в копии нет — он у каждого пользователя свой.

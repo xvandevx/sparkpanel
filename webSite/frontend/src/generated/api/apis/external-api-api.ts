@@ -24,6 +24,8 @@ import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError
 // @ts-ignore
 import type { ApiKeyDto } from '../models';
 // @ts-ignore
+import type { ApiListDto } from '../models';
+// @ts-ignore
 import type { CreateApiKeyDto } from '../models';
 // @ts-ignore
 import type { CreatedApiKeyDto } from '../models';
@@ -81,6 +83,40 @@ export const ExternalApiApiAxiosParamCreator = function (configuration?: Configu
          */
         apiKeysControllerFindKeys: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/api/external-api/keys`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication JWT-auth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Списки внешнего API — куда ключ может писать
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiKeysControllerLists: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/external-api/lists`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -216,6 +252,18 @@ export const ExternalApiApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary Списки внешнего API — куда ключ может писать
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiKeysControllerLists(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<ApiListDto>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiKeysControllerLists(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ExternalApiApi.apiKeysControllerLists']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary Отозвать ключ — он сразу перестаёт работать
          * @param {number} id 
          * @param {*} [options] Override http request option.
@@ -270,6 +318,15 @@ export const ExternalApiApiFactory = function (configuration?: Configuration, ba
         },
         /**
          * 
+         * @summary Списки внешнего API — куда ключ может писать
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiKeysControllerLists(options?: RawAxiosRequestConfig): AxiosPromise<Array<ApiListDto>> {
+            return localVarFp.apiKeysControllerLists(options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary Отозвать ключ — он сразу перестаёт работать
          * @param {number} id 
          * @param {*} [options] Override http request option.
@@ -318,6 +375,17 @@ export class ExternalApiApi extends BaseAPI {
      */
     public apiKeysControllerFindKeys(options?: RawAxiosRequestConfig) {
         return ExternalApiApiFp(this.configuration).apiKeysControllerFindKeys(options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Списки внешнего API — куда ключ может писать
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof ExternalApiApi
+     */
+    public apiKeysControllerLists(options?: RawAxiosRequestConfig) {
+        return ExternalApiApiFp(this.configuration).apiKeysControllerLists(options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

@@ -33,6 +33,7 @@ base.ts
 common.ts
 configuration.ts
 docs/ApiKeyDto.md
+docs/ApiListDto.md
 docs/AuthApi.md
 docs/BackupCheckDto.md
 docs/BackupCountsDto.md
@@ -152,6 +153,7 @@ docs/UsersApi.md
 git_push.sh
 index.ts
 models/api-key-dto.ts
+models/api-list-dto.ts
 models/backup-check-dto.ts
 models/backup-counts-dto.ts
 models/backup-dto.ts

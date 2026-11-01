@@ -17,7 +17,7 @@ import {
   type PanelProperty,
   type PanelValue,
 } from './mcp-values';
-import { PanelClient } from './panel-client';
+import { PanelClient } from '../common/panel-client';
 
 /** Что инструмент вернул ассистенту и что запомнит журнал. */
 export interface ToolOutcome {
@@ -221,22 +221,24 @@ export class McpToolsService {
   private async saveRecord(user: JwtPayload, args: Args): Promise<ToolOutcome> {
     const loaded = await this.load(user, text(args, 'list'));
     const { list, settings, properties } = loaded;
-    const fields = optionalObject(args, 'fields') ?? {};
+    const allFields = optionalObject(args, 'fields') ?? {};
     const changes = valuesOf(properties, optionalObject(args, 'properties') ?? {});
-    assertFields(fields, this.fieldsOf(loaded));
+    assertFields(allFields, this.fieldsOf(loaded));
+    // Внешний ID — не содержимое записи, а её номер у источника: пишется сразу, мимо черновика
+    const { externalId, ...fields } = allFields;
 
     const target = optionalText(args, 'target') ?? (settings.isDraftEnabled ? 'draft' : 'published');
     if (target !== 'draft' && target !== 'published') throw new BadRequestException('target — "draft" или "published"');
     if (target === 'draft' && !settings.isDraftEnabled) {
       throw new BadRequestException('В этом списке черновики выключены — сохраните с target "published"');
     }
-    const changed = changedNames(fields, changes, properties);
+    const changed = changedNames(allFields, changes, properties);
     const toDraft = target === 'draft';
 
     if (args.id === undefined) {
       if (!list.canCreate) throw new BadRequestException('Файлы заводятся загрузкой — upload_file');
       const created = await this.panel.post<Row>(user, list.path(list.owner), this.sectionBody(list, fields));
-      await this.saveValues(user, list, created.id, changes, fields);
+      await this.saveValues(user, list, created.id, changes, fields, externalId);
       if (toDraft) {
         await this.panel.put(user, `/infoblocks/drafts/${list.key}/${created.id}`, { fields: {}, values: [], isNew: true });
       }
@@ -257,10 +259,11 @@ export class McpToolsService {
         fields: { ...(stored?.fields ?? {}), ...fields },
         values: mergeValues(stored?.values ?? [], changes),
       });
+      await this.saveValues(user, list, before.id, [], {}, externalId);
     } else {
       const body = this.sectionBody(list, fields);
       if (Object.keys(body).length > 0) await this.panel.patch(user, `${list.path(list.owner)}/${before.id}`, body);
-      await this.saveValues(user, list, before.id, changes, fields);
+      await this.saveValues(user, list, before.id, changes, fields, externalId);
     }
 
     const record = await this.recordOf(user, loaded, before.id);
@@ -395,17 +398,22 @@ export class McpToolsService {
     return rest;
   }
 
-  /** Свойства — маршрутом значений; туда же родитель, если раздел его не хранит. */
+  /**
+   * Свойства — маршрутом значений; туда же родитель, если раздел его не хранит,
+   * и внешний ID — он живёт в строке записи рядом со значениями.
+   */
   private async saveValues(
     user: JwtPayload,
     list: McpList,
     recordId: number,
     values: PanelValue[],
     fields: Record<string, unknown>,
+    externalId?: unknown,
   ): Promise<void> {
     const parent = !list.isOwnParent && fields.parentId !== undefined ? { parentId: fields.parentId === null ? null : String(fields.parentId) } : {};
-    if (values.length === 0 && !('parentId' in parent)) return;
-    await this.panel.patch(user, `/infoblocks/${list.key}/values/${recordId}`, { values, ...parent });
+    const external = externalId !== undefined ? { externalId } : {};
+    if (values.length === 0 && !('parentId' in parent) && !('externalId' in external)) return;
+    await this.panel.patch(user, `/infoblocks/${list.key}/values/${recordId}`, { values, ...parent, ...external });
   }
 
   private what(loaded: Loaded, record: Row): string {

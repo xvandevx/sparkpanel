@@ -21,7 +21,7 @@ interface ProductCreationAttrs {
  */
 @Table({
   tableName: 'infoblock_products',
-  indexes: [{ fields: ['userId'] }],
+  indexes: [{ fields: ['userId'] }, { name: 'infoblock_products_code', fields: ['code'] }],
 })
 export class Products extends Model<Products, ProductCreationAttrs> {
   @ApiProperty({ example: 1, description: 'Порядковый номер товара' })

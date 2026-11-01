@@ -4,25 +4,32 @@ import type { AppDispatch } from '../../redux';
 import {
   createApiKeyThunk,
   loadApiKeysThunk,
+  loadApiListsThunk,
   removeApiKeyThunk,
   type ApiKey,
+  type ApiList,
+  type NewApiKey,
 } from '../../redux/action-creaters/externalApi';
 
 /**
- * Ключи внешнего API глазами вкладки «Доступ»: список, создать, отозвать.
- * Читаются при открытии и после каждой своей правки. Действия бросают ошибку
- * текстом — сообщение показывает тот, кто нажимал.
+ * Ключи внешнего API глазами вкладки «Доступ»: список, создать, отозвать —
+ * и списки API, из которых выбирают, куда ключ может писать. Читаются при
+ * открытии и после каждой своей правки. Действия бросают ошибку текстом —
+ * сообщение показывает тот, кто нажимал.
  */
 export function useApiKeys() {
   const dispatch = useDispatch<AppDispatch>();
   const [keys, setKeys] = useState<ApiKey[]>([]);
+  const [lists, setLists] = useState<ApiList[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setIsLoading(true);
     try {
-      setKeys(await dispatch(loadApiKeysThunk()));
+      const [loadedKeys, loadedLists] = await Promise.all([dispatch(loadApiKeysThunk()), dispatch(loadApiListsThunk())]);
+      setKeys(loadedKeys);
+      setLists(loadedLists);
       setError(null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Не удалось загрузить ключи');
@@ -36,8 +43,8 @@ export function useApiKeys() {
   }, [reload]);
 
   /** Создать ключ; ответ — ключ целиком, больше его не покажут. */
-  const create = async (name: string): Promise<string> => {
-    const { secret } = await dispatch(createApiKeyThunk(name));
+  const create = async (key: NewApiKey): Promise<string> => {
+    const { secret } = await dispatch(createApiKeyThunk(key));
     await reload();
     return secret;
   };
@@ -47,5 +54,5 @@ export function useApiKeys() {
     await reload();
   };
 
-  return { keys, isLoading, error, create, revoke };
+  return { keys, lists, isLoading, error, create, revoke };
 }

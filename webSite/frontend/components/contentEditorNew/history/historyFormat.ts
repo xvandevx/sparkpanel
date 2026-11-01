@@ -29,6 +29,8 @@ const COMMON_LABELS: Record<string, string> = {
   isActive: 'Активность',
   parentId: 'Родитель',
   position: 'Порядок',
+  // Номер записи в системе-источнике: его пишет интеграция
+  externalId: 'Внешний ID',
   // Родитель записи в дереве, которое ведут настройки списка
   'tree.parentId': 'Родитель',
 };

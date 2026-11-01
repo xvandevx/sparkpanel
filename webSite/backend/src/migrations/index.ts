@@ -1,4 +1,5 @@
 import { sharedListSettings } from './0001-shared-list-settings';
+import { externalWrite } from './0002-external-write';
 import { Migration } from './migration';
 
 /**
@@ -6,4 +7,4 @@ import { Migration } from './migration';
  * `NNNN-суть.ts`. Применённую не правят и не удаляют: её имя уже записано
  * в `schema_migrations`, исправление — следующей миграцией.
  */
-export const MIGRATIONS: Migration[] = [sharedListSettings];
+export const MIGRATIONS: Migration[] = [sharedListSettings, externalWrite];

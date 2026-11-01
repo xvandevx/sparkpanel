@@ -13,7 +13,7 @@ interface PageCreationAttrs {
 
 @Table({
   tableName: 'infoblock_pages',
-  indexes: [{ fields: ['userId'] }, { fields: ['parentId'] }],
+  indexes: [{ fields: ['userId'] }, { fields: ['parentId'] }, { name: 'infoblock_pages_code', fields: ['code'] }],
 })
 /**
  * Страница сайта. Своих полей у неё только стандартные — название, код,

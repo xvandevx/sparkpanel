@@ -50,5 +50,17 @@ export interface ApiKeyDto {
      * @memberof ApiKeyDto
      */
     'createdAt': string;
+    /**
+     * Пишет ли ключ; читает он всегда
+     * @type {boolean}
+     * @memberof ApiKeyDto
+     */
+    'isWritable': boolean;
+    /**
+     * Куда ключ пишет: ключи списков; null — во все списки API (или ключ только читает)
+     * @type {Array<string>}
+     * @memberof ApiKeyDto
+     */
+    'writeLists': Array<string> | null;
 }
 

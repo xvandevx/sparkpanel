@@ -402,7 +402,7 @@ export default function ContentEditorDrawer({
     );
 
   // Даты — внизу вкладки «Запись», у сохранённой записи
-  const dates = record !== null && !isNew(record) ? <RecordDates record={record} /> : null;
+  const dates = record !== null && !isNew(record) ? <RecordDates listKey={listKey} record={record} /> : null;
 
   const propertyFieldsOf = (tab: EditorFields) =>
     values === null ? null : (

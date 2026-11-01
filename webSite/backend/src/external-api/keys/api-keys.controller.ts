@@ -4,7 +4,7 @@ import { Request } from 'express';
 import { RootOnlyGuard } from '../../common';
 import { originOf } from '../external-api.controller';
 import { ExternalApiService } from '../external-api.service';
-import { ApiKeyDto, CreateApiKeyDto, CreatedApiKeyDto } from './api-key.dto';
+import { ApiKeyDto, ApiListDto, CreateApiKeyDto, CreatedApiKeyDto } from './api-key.dto';
 import { ApiKeysService } from './api-keys.service';
 
 /**
@@ -32,8 +32,20 @@ export class ApiKeysController {
   @ApiOperation({ summary: 'Создать ключ. Ответ — единственный раз, когда ключ виден целиком' })
   @ApiOkResponse({ type: CreatedApiKeyDto })
   @Post('keys')
-  createKey(@Req() req: Request, @Body() dto: CreateApiKeyDto) {
-    return this.keys.create(req.user.id, dto.name);
+  async createKey(@Req() req: Request, @Body() dto: CreateApiKeyDto) {
+    const lists = await this.api.lists();
+    return this.keys.create(
+      req.user.id,
+      dto,
+      lists.map((list) => list.listKey),
+    );
+  }
+
+  @ApiOperation({ summary: 'Списки внешнего API — куда ключ может писать' })
+  @ApiOkResponse({ type: [ApiListDto] })
+  @Get('lists')
+  async lists(): Promise<ApiListDto[]> {
+    return (await this.api.lists()).map(({ listKey, name, group, path }) => ({ listKey, name, group, path }));
   }
 
   @ApiOperation({ summary: 'Отозвать ключ — он сразу перестаёт работать' })

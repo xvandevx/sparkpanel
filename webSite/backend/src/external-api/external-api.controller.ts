@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Public } from '../common';
@@ -9,8 +9,11 @@ import {
   ExternalItemsQueryDto,
   PageByUrlQueryDto,
 } from './dto/external-query.dto';
+import { ExternalBatchDto, ExternalWriteDto } from './dto/external-write.dto';
 import { ExternalApiService } from './external-api.service';
 import { ApiKeyGuard } from './keys/api-key.guard';
+import type { ApiKeyOwner } from './keys/api-keys.service';
+import { ExternalWriteService } from './write/external-write.service';
 
 /**
  * Внешний адрес панели: из него — полные адреса файлов и `servers` спецификации.
@@ -27,11 +30,16 @@ export const originOf = (req: Request): string => {
 const pathOf = (...segments: (string | undefined)[]): string =>
   '/' + segments.filter((segment) => segment !== undefined).join('/');
 
+/** Ключ запроса — его положил `ApiKeyGuard`, без него сюда не попасть. */
+const keyOf = (req: Request): ApiKeyOwner => req.apiKey as ApiKeyOwner;
+
 /**
- * Внешнее API (`/api/v1`) — только чтение, по ключу `X-Api-Key` вместо JWT.
- * У каждого списка одни и те же методы; список — первые один-два сегмента
- * адреса. Маршрут записи по коду объявлен раньше двухсегментных: иначе запись
- * с кодом `items` ушла бы не туда.
+ * Внешнее API (`/api/v1`) — по ключу `X-Api-Key` вместо JWT. Читает любой
+ * ключ, пишет — ключ с правом записи и только в разрешённые ему списки
+ * (проверяет `ExternalWriteService`). У каждого списка одни и те же методы;
+ * список — первые один-два сегмента адреса. Маршруты `items/external/…`
+ * и запись по коду объявлены раньше двухсегментных: иначе запись с кодом
+ * `items` ушла бы не туда.
  *
  * В Swagger панели не входит: внешнее API описывает своя спецификация,
  * собранная из настроек списков, — `GET /api/v1/openapi.json`.
@@ -41,7 +49,10 @@ const pathOf = (...segments: (string | undefined)[]): string =>
 @UseGuards(ApiKeyGuard)
 @Controller('v1')
 export class ExternalApiController {
-  constructor(private readonly api: ExternalApiService) {}
+  constructor(
+    private readonly api: ExternalApiService,
+    private readonly write: ExternalWriteService,
+  ) {}
 
   @Get('openapi.json')
   spec(@Req() req: Request) {
@@ -61,6 +72,27 @@ export class ExternalApiController {
   @Get('domains/by-host')
   domainByHost(@Req() req: Request, @Query() query: DomainByHostQueryDto) {
     return this.api.domainByHost(query.host, originOf(req));
+  }
+
+  @Get(':a/items/external/:externalId')
+  itemByExternalId(
+    @Req() req: Request,
+    @Param('a') a: string,
+    @Param('externalId') externalId: string,
+    @Query() query: ExternalItemQueryDto,
+  ) {
+    return this.api.itemByExternalId(pathOf(a), externalId, query, originOf(req));
+  }
+
+  @Get(':a/:b/items/external/:externalId')
+  nestedItemByExternalId(
+    @Req() req: Request,
+    @Param('a') a: string,
+    @Param('b') b: string,
+    @Param('externalId') externalId: string,
+    @Query() query: ExternalItemQueryDto,
+  ) {
+    return this.api.itemByExternalId(pathOf(a, b), externalId, query, originOf(req));
   }
 
   @Get(':a/items/:idOrCode')
@@ -107,5 +139,90 @@ export class ExternalApiController {
   @Get(':a/:b/facets')
   nestedFacets(@Param('a') a: string, @Param('b') b: string, @Query() query: ExternalFacetsQueryDto) {
     return this.api.facets(pathOf(a, b), query);
+  }
+
+  /* --- запись: ключ с правом записи --- */
+
+  @Post(':a/items/batch')
+  @HttpCode(200)
+  batch(@Req() req: Request, @Param('a') a: string, @Body() dto: ExternalBatchDto) {
+    return this.write.batch(keyOf(req), pathOf(a), dto.items);
+  }
+
+  @Post(':a/:b/items/batch')
+  @HttpCode(200)
+  nestedBatch(@Req() req: Request, @Param('a') a: string, @Param('b') b: string, @Body() dto: ExternalBatchDto) {
+    return this.write.batch(keyOf(req), pathOf(a, b), dto.items);
+  }
+
+  @Post(':a/items')
+  create(@Req() req: Request, @Param('a') a: string, @Body() dto: ExternalWriteDto) {
+    return this.write.create(keyOf(req), pathOf(a), dto);
+  }
+
+  @Post(':a/:b/items')
+  nestedCreate(@Req() req: Request, @Param('a') a: string, @Param('b') b: string, @Body() dto: ExternalWriteDto) {
+    return this.write.create(keyOf(req), pathOf(a, b), dto);
+  }
+
+  @Put(':a/items/external/:externalId')
+  upsert(@Req() req: Request, @Param('a') a: string, @Param('externalId') externalId: string, @Body() dto: ExternalWriteDto) {
+    return this.write.upsert(keyOf(req), pathOf(a), externalId, dto);
+  }
+
+  @Put(':a/:b/items/external/:externalId')
+  nestedUpsert(
+    @Req() req: Request,
+    @Param('a') a: string,
+    @Param('b') b: string,
+    @Param('externalId') externalId: string,
+    @Body() dto: ExternalWriteDto,
+  ) {
+    return this.write.upsert(keyOf(req), pathOf(a, b), externalId, dto);
+  }
+
+  @Patch(':a/items/:idOrCode')
+  update(@Req() req: Request, @Param('a') a: string, @Param('idOrCode') idOrCode: string, @Body() dto: ExternalWriteDto) {
+    return this.write.update(keyOf(req), pathOf(a), idOrCode, dto);
+  }
+
+  @Patch(':a/:b/items/:idOrCode')
+  nestedUpdate(
+    @Req() req: Request,
+    @Param('a') a: string,
+    @Param('b') b: string,
+    @Param('idOrCode') idOrCode: string,
+    @Body() dto: ExternalWriteDto,
+  ) {
+    return this.write.update(keyOf(req), pathOf(a, b), idOrCode, dto);
+  }
+
+  @Delete(':a/items/external/:externalId')
+  @HttpCode(204)
+  removeByExternalId(@Req() req: Request, @Param('a') a: string, @Param('externalId') externalId: string) {
+    return this.write.removeByExternalId(keyOf(req), pathOf(a), externalId);
+  }
+
+  @Delete(':a/:b/items/external/:externalId')
+  @HttpCode(204)
+  nestedRemoveByExternalId(
+    @Req() req: Request,
+    @Param('a') a: string,
+    @Param('b') b: string,
+    @Param('externalId') externalId: string,
+  ) {
+    return this.write.removeByExternalId(keyOf(req), pathOf(a, b), externalId);
+  }
+
+  @Delete(':a/items/:idOrCode')
+  @HttpCode(204)
+  remove(@Req() req: Request, @Param('a') a: string, @Param('idOrCode') idOrCode: string) {
+    return this.write.remove(keyOf(req), pathOf(a), idOrCode);
+  }
+
+  @Delete(':a/:b/items/:idOrCode')
+  @HttpCode(204)
+  nestedRemove(@Req() req: Request, @Param('a') a: string, @Param('b') b: string, @Param('idOrCode') idOrCode: string) {
+    return this.write.remove(keyOf(req), pathOf(a, b), idOrCode);
   }
 }

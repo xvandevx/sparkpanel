@@ -1,7 +1,7 @@
 import { InfoblockPropertyDto } from '../settings/properties/property.dto';
 import { PropertyType, normalizeValues } from '../settings/properties/property';
 import { PropertyValue } from './property-values.model';
-import { valueRows, valuesMap } from './property-values.service';
+import { integrationOnlyError, valueRows, valuesMap } from './property-values.service';
 
 const property = (patch: Partial<InfoblockPropertyDto>): InfoblockPropertyDto =>
   ({
@@ -83,5 +83,28 @@ describe('мультидоменные значения в строках баз
     expect(normalizeValues([multi], valuesMap([multi], plain), false).values.title).toEqual([
       { domainIds: null, value: 'старое' },
     ]);
+  });
+});
+
+describe('что пишет только интеграция', () => {
+  const external = property({ name: 'Остаток', isExternal: true });
+  const plain = property({ name: 'Заголовок' });
+
+  it('из панели свойство «Внешний источник» не правится', () => {
+    expect(integrationOnlyError([plain, external], false, { via: null })).toBe(
+      'Свойство «Остаток» заполняется из внешнего источника — в панели его не правят',
+    );
+    expect(integrationOnlyError([plain], false, { via: null })).toBeNull();
+  });
+
+  it('ключ API и MCP его пишут', () => {
+    expect(integrationOnlyError([external], false, { via: 'API «1С»' })).toBeNull();
+    expect(integrationOnlyError([external], true, { via: 'MCP «Claude»' })).toBeNull();
+  });
+
+  it('внешний ID из панели не задают', () => {
+    expect(integrationOnlyError([], true, { via: null })).toBe(
+      'Внешний ID задаёт только интеграция — через внешнее API или MCP',
+    );
   });
 });

@@ -10,6 +10,8 @@ Name | Type | Description | Notes
 **keyTail** | **string** | Последние символы ключа | [default to undefined]
 **lastUsedAt** | **string** | null — запросов ещё не было | [default to undefined]
 **createdAt** | **string** |  | [default to undefined]
+**isWritable** | **boolean** | Пишет ли ключ; читает он всегда | [default to undefined]
+**writeLists** | **Array&lt;string&gt;** | Куда ключ пишет: ключи списков; null — во все списки API (или ключ только читает) | [default to undefined]
 
 ## Example
 
@@ -22,6 +24,8 @@ const instance: ApiKeyDto = {
     keyTail,
     lastUsedAt,
     createdAt,
+    isWritable,
+    writeLists,
 };
 ```
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Alert, App, Button, Card, Descriptions, Popconfirm, Table, Typography } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { formatDateTime } from '../../../logic/dateFormat';
-import { lastUsedText, maskedKey, useApiAddress, useApiKeys, type ApiKey } from '../../../logic/externalApi';
+import { keyRightsText, lastUsedText, maskedKey, useApiAddress, useApiKeys, type ApiKey } from '../../../logic/externalApi';
 import ApiKeyDialog from './ApiKeyDialog';
 
 const errorText = (error: unknown, fallback: string): string =>
@@ -43,7 +43,8 @@ export default function ApiAccess() {
               label: 'Авторизация',
               children: (
                 <>
-                  Заголовок <Typography.Text code>X-Api-Key</Typography.Text>, только чтение
+                  Заголовок <Typography.Text code>X-Api-Key</Typography.Text>. Читает любой ключ, пишет — ключ
+                  с правом записи и только в разрешённые ему списки
                 </>
               ),
             },
@@ -51,6 +52,18 @@ export default function ApiAccess() {
               key: 'data',
               label: 'Что отдаётся',
               children: 'Страницы, контент, каталог и домены — активные опубликованные записи. Скрытые свойства — никогда',
+            },
+            {
+              key: 'write',
+              label: 'Запись',
+              children: (
+                <>
+                  Для интеграций (учёт, склад, CRM): <Typography.Text code>PUT …/items/external/{'{externalId}'}</Typography.Text>{' '}
+                  заводит или правит запись по её номеру в системе-источнике,{' '}
+                  <Typography.Text code>POST …/items/batch</Typography.Text> — то же пакетом до 500 записей. Сразу
+                  публикуется, журнал подписан названием ключа
+                </>
+              ),
             },
             {
               key: 'properties',
@@ -78,7 +91,8 @@ export default function ApiAccess() {
             {
               key: 'errors',
               label: 'Ошибки',
-              children: '400 — непонятный параметр · 401 — нет ключа или он отозван · 404 — нет записи',
+              children:
+                '400 — непонятный параметр или значение · 401 — нет ключа или он отозван · 403 — ключу нельзя писать сюда · 404 — нет записи · 409 — код или внешний ID заняты',
             },
           ]}
         />
@@ -100,7 +114,7 @@ export default function ApiAccess() {
           loading={keys.isLoading}
           dataSource={keys.keys}
           pagination={false}
-          scroll={{ x: 760 }}
+          scroll={{ x: 960 }}
           locale={{ emptyText: 'Ключей пока нет — сайт не может забирать данные' }}
           columns={[
             { key: 'name', title: 'Название', dataIndex: 'name' },
@@ -109,6 +123,7 @@ export default function ApiAccess() {
               title: 'Ключ',
               render: (_, key) => <Typography.Text type="secondary" code>{maskedKey(key.keyTail)}</Typography.Text>,
             },
+            { key: 'rights', title: 'Права', render: (_, key) => keyRightsText(key, keys.lists) },
             { key: 'createdAt', title: 'Создан', render: (_, key) => formatDateTime(key.createdAt) },
             { key: 'lastUsedAt', title: 'Последний запрос', render: (_, key) => lastUsedText(key.lastUsedAt) },
             {
@@ -137,7 +152,12 @@ export default function ApiAccess() {
         </Typography.Paragraph>
       </Card>
 
-      <ApiKeyDialog isOpen={isCreating} onCreate={keys.create} onClose={() => setIsCreating(false)} />
+      <ApiKeyDialog
+        isOpen={isCreating}
+        lists={keys.lists}
+        onCreate={keys.create}
+        onClose={() => setIsCreating(false)}
+      />
     </div>
   );
 }

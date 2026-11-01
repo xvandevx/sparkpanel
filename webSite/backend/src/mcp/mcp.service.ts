@@ -2,7 +2,7 @@ import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { McpCallsService } from './calls/mcp-calls.service';
 import { isChangeTool, MCP_INSTRUCTIONS, MCP_TOOLS } from './mcp-tools';
 import { McpToolsService, type ToolOutcome } from './mcp-tools.service';
-import { PanelError } from './panel-client';
+import { PanelError } from '../common/panel-client';
 import { McpCaller } from './tokens/mcp-tokens.service';
 
 /** Версии протокола, которые сервер понимает; первая — новейшая. */

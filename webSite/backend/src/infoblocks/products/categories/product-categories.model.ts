@@ -20,7 +20,11 @@ interface ProductCategoryCreationAttrs {
  */
 @Table({
   tableName: 'infoblock_products_categories',
-  indexes: [{ fields: ['userId'] }, { fields: ['parentId'] }],
+  indexes: [
+    { fields: ['userId'] },
+    { fields: ['parentId'] },
+    { name: 'infoblock_products_categories_code', fields: ['code'] },
+  ],
 })
 export class ProductCategories extends Model<ProductCategories, ProductCategoryCreationAttrs> {
   @ApiProperty({ example: 1, description: 'Порядковый номер категории' })

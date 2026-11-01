@@ -1,6 +1,6 @@
 import { CONTENTS_LIST } from '../infoblocks/contents/content-lists';
 import { PropertyType } from '../infoblocks/settings/properties/property';
-import { DOMAINS_API, PAGES_API, type ApiList, type RecordField } from './api-lists';
+import { BATCH_LIMIT, DOMAINS_API, PAGES_API, type ApiList, type RecordField, type WriteField } from './api-lists';
 import { FACET_TYPES, isExpandable, linkListOf, type ApiPropertyDef } from './external-values';
 import { API_KEY_HEADER } from './keys/api-key.guard';
 import { PAGE_SIZES } from '../infoblocks/records/records-page';
@@ -29,6 +29,7 @@ const nullable = (schema: Schema): Schema => ({ anyOf: [schema, { type: 'null' }
 
 const FIELD_SCHEMAS: Record<RecordField, Schema> = {
   id: { type: 'integer', description: 'Номер записи' },
+  externalId: { type: ['string', 'null'], description: 'Внешний ID — номер записи в системе-источнике; null — не задан' },
   code: { type: 'string', description: 'Символьный код' },
   name: { type: 'string', description: 'Название' },
   parentId: { type: ['integer', 'null'], description: 'Родитель в дереве; null — запись верхнего уровня' },
@@ -76,6 +77,84 @@ function propertySchema(property: ApiPropertyDef, targets: ExpandTargets): Schem
     (isExpandable(property, targets) ? ' С `expand` — связанная запись целиком.' : '');
   if (property.multiple) return { type: 'array', items: one, description: title + typeNote };
   return { ...nullable(one), description: title + typeNote };
+}
+
+/** Поля записи в теле записи (`fields`). */
+const WRITE_FIELD_SCHEMAS: Record<WriteField, Schema> = {
+  externalId: {
+    type: ['string', 'null'],
+    maxLength: 255,
+    description: 'Внешний ID: уникален в списке; пусто или null — стереть',
+  },
+  name: { type: 'string', description: 'Название; при создании обязательно' },
+  code: { type: 'string', description: 'Символьный код: строчная латиница, цифры, дефис' },
+  isActive: { type: 'boolean', description: 'Активна ли запись; неактивную чтение не отдаёт' },
+  sort: { type: 'integer', description: 'Сортировка, по умолчанию 500: меньше — выше' },
+  parentId: { type: ['integer', 'null'], description: 'Номер родителя; null — запись верхнего уровня' },
+  parentExternalId: { type: ['string', 'null'], description: 'Родитель внешним ID — вместо parentId' },
+};
+
+/** Схема одного значения свойства в теле записи: варианты и привязки — ещё и кодами. */
+function inputValueSchema(property: ApiPropertyDef): Schema {
+  switch (property.type) {
+    case PropertyType.Number:
+      return { type: 'number' };
+    case PropertyType.List:
+    case PropertyType.ListOptionLink:
+      return {
+        anyOf: [{ type: 'string', enum: property.options.map((option) => option.code) }, { type: 'integer' }],
+        description: 'Код варианта или его номер',
+      };
+    case PropertyType.File:
+    case PropertyType.Image:
+      return { type: 'integer', description: 'Номер уже загруженного файла' };
+    case PropertyType.ContentLink:
+    case PropertyType.ContentTypeLink:
+      return ref('LinkInput');
+    case PropertyType.Table:
+      return { type: 'array', items: { type: 'array', items: { type: 'string' } }, description: 'Строки таблицы' };
+    default:
+      return { type: 'string' };
+  }
+}
+
+function inputPropertySchema(property: ApiPropertyDef): Schema {
+  const one = inputValueSchema(property);
+  const value = property.multiple ? { type: 'array', items: one } : one;
+  const title = [property.name, property.hint].filter(Boolean).join(' — ');
+  if (property.isMultiDomain) {
+    return {
+      type: ['array', 'null'],
+      items: ref('DomainGroupInput'),
+      description: `${title}. Мультидоменное: группы по доменам, value группы — ${property.multiple ? 'массив значений' : 'одно значение'}`,
+    };
+  }
+  return { ...nullable(value), description: `${title}. null — стереть` };
+}
+
+/**
+ * Тело записи. У upsert и пакета внешний ID — в адресе или в строке пакета,
+ * поэтому в их `fields` его нет (`isUpsert`).
+ */
+function inputSchema({ list, properties }: SpecList, isUpsert: boolean): Schema {
+  const fields = list.writeFields.filter((field) => !isUpsert || field !== 'externalId');
+  return {
+    type: 'object',
+    properties: {
+      fields: {
+        type: 'object',
+        additionalProperties: false,
+        description: 'Поля записи; неприсланные остаются как были',
+        properties: Object.fromEntries(fields.map((field) => [field, WRITE_FIELD_SCHEMAS[field]])),
+      },
+      properties: {
+        type: 'object',
+        additionalProperties: false,
+        description: 'Свойства по коду; неприсланные остаются как были, null стирает значение',
+        properties: Object.fromEntries(properties.map((property) => [property.code, inputPropertySchema(property)])),
+      },
+    },
+  };
 }
 
 function recordSchema({ list, properties }: SpecList, targets: ExpandTargets): Schema {
@@ -156,7 +235,7 @@ function filterParams(properties: ApiPropertyDef[]): Schema[] {
 
 /** По чему сортируют: поля записи и свойства-строки и числа. */
 export function sortKeys({ list, properties }: SpecList): string[] {
-  const fields = list.fields.filter((field) => field !== 'parentId');
+  const fields = list.fields.filter((field) => field !== 'parentId' && field !== 'externalId');
   const own = properties
     .filter((property) => !property.multiple && [PropertyType.Number, PropertyType.String].includes(property.type))
     .map((property) => property.code);
@@ -169,6 +248,44 @@ const ok = (description: string, schema: Schema): Schema => ({
 });
 
 const notFound = { '404': { $ref: '#/components/responses/NotFound' } };
+
+/** Ответы записи: кроме успеха — ошибки проверок, ключа и прав. */
+const writeErrors = {
+  '400': { $ref: '#/components/responses/BadRequest' },
+  '401': { $ref: '#/components/responses/Unauthorized' },
+  '403': { $ref: '#/components/responses/Forbidden' },
+  '409': { $ref: '#/components/responses/Conflict' },
+};
+
+const WRITE_NOTE = '**Нужен ключ с правом записи в этот список.**';
+
+/** Метод записи: пометка о праве — и в описании, и значком в документации. */
+const writeOperation = (operation: Schema): Schema => ({
+  ...operation,
+  description: `${WRITE_NOTE} ${operation.description as string}`,
+  'x-badges': [{ name: 'Запись', color: 'orange' }],
+});
+
+const jsonBody = (schema: Schema): Schema => ({
+  required: true,
+  content: { 'application/json': { schema } },
+});
+
+const EXTERNAL_ID_PARAM: Schema = {
+  name: 'externalId',
+  in: 'path',
+  required: true,
+  schema: { type: 'string', maxLength: 255 },
+  description: 'Внешний ID записи — номер в системе-источнике',
+};
+
+const ID_OR_CODE_PARAM: Schema = {
+  name: 'idOrCode',
+  in: 'path',
+  required: true,
+  schema: { type: 'string' },
+  description: 'Номер или символьный код записи',
+};
 
 /**
  * Тег списка — его раздел в меню документации. Имя тега уникально на всю
@@ -188,6 +305,8 @@ function listPaths(spec: SpecList, targets: ExpandTargets): Record<string, Schem
   const isMultiDomain = properties.some((property) => property.isMultiDomain);
   const domain = isMultiDomain ? [DOMAIN_PARAM] : [];
   const facetProps = properties.filter((property) => FACET_TYPES.has(property.type));
+  const input = inputSchemaName(list);
+  const upsertInput = upsertSchemaName(list);
 
   const paths: Record<string, Schema> = {
     [`${list.path}/items`]: {
@@ -220,6 +339,17 @@ function listPaths(spec: SpecList, targets: ExpandTargets): Record<string, Schem
           },
         }),
       },
+      post: writeOperation({
+        tags: [tag],
+        operationId: `${opId}_create`,
+        summary: `${list.name} — создать`,
+        description: 'Новая запись из `fields` и `properties`; сразу публикуется. С `fields.externalId` — сразу с внешним ID.',
+        requestBody: jsonBody(ref(input)),
+        responses: {
+          '201': { description: 'Запись создана', content: { 'application/json': { schema: ref('WriteResult') } } },
+          ...writeErrors,
+        },
+      }),
     },
     [`${list.path}/items/{idOrCode}`]: {
       get: {
@@ -227,13 +357,85 @@ function listPaths(spec: SpecList, targets: ExpandTargets): Record<string, Schem
         operationId: `${opId}_item`,
         summary: `${list.name} — запись`,
         description: 'Одна запись по номеру или символьному коду.',
-        parameters: [
-          { name: 'idOrCode', in: 'path', required: true, schema: { type: 'string' }, description: 'Номер или символьный код записи' },
-          ...expand,
-          ...domain,
-        ],
+        parameters: [ID_OR_CODE_PARAM, ...expand, ...domain],
         responses: { ...ok('Запись', ref(list.schema)), ...notFound },
       },
+      patch: writeOperation({
+        tags: [tag],
+        operationId: `${opId}_update`,
+        summary: `${list.name} — изменить`,
+        description: 'Меняется только присланное: поля из `fields`, свойства из `properties`. Сразу публикуется; черновик записи не трогается.',
+        parameters: [ID_OR_CODE_PARAM],
+        requestBody: jsonBody(ref(input)),
+        responses: { ...ok('Запись изменена', ref('WriteResult')), ...writeErrors, ...notFound },
+      }),
+      delete: writeOperation({
+        tags: [tag],
+        operationId: `${opId}_delete`,
+        summary: `${list.name} — удалить`,
+        description: 'Удалить запись вместе со значениями её свойств. Защищённую панель не удалит — 409.',
+        parameters: [ID_OR_CODE_PARAM],
+        responses: { '204': { description: 'Удалено' }, ...writeErrors, ...notFound },
+      }),
+    },
+    [`${list.path}/items/external/{externalId}`]: {
+      get: {
+        tags: [tag],
+        operationId: `${opId}_item_external`,
+        summary: `${list.name} — запись по внешнему ID`,
+        description: 'Одна запись по внешнему ID — номеру в системе-источнике.',
+        parameters: [EXTERNAL_ID_PARAM, ...expand, ...domain],
+        responses: { ...ok('Запись', ref(list.schema)), ...notFound },
+      },
+      put: writeOperation({
+        tags: [tag],
+        operationId: `${opId}_upsert`,
+        summary: `${list.name} — записать по внешнему ID`,
+        description:
+          'Upsert: запись с этим внешним ID есть — меняется присланное, нет — заводится с ним. Так интеграция держит запись в актуальном виде, не храня номеров панели.',
+        parameters: [EXTERNAL_ID_PARAM],
+        requestBody: jsonBody(ref(upsertInput)),
+        responses: { ...ok('Запись создана или изменена', ref('WriteResult')), ...writeErrors },
+      }),
+      delete: writeOperation({
+        tags: [tag],
+        operationId: `${opId}_delete_external`,
+        summary: `${list.name} — удалить по внешнему ID`,
+        description: 'Удалить запись с этим внешним ID.',
+        parameters: [EXTERNAL_ID_PARAM],
+        responses: { '204': { description: 'Удалено' }, ...writeErrors, ...notFound },
+      }),
+    },
+    [`${list.path}/items/batch`]: {
+      post: writeOperation({
+        tags: [tag],
+        operationId: `${opId}_batch`,
+        summary: `${list.name} — пакет по внешнему ID`,
+        description:
+          `Upsert до ${BATCH_LIMIT} записей одним запросом, по порядку. Ошибка одной записи не останавливает остальные: ` +
+          'результат — по каждой записи в порядке запроса. Запись, заведённая раньше в пакете, уже видна следующим — дерево собирается `parentExternalId`.',
+        requestBody: jsonBody({
+          type: 'object',
+          required: ['items'],
+          properties: {
+            items: {
+              type: 'array',
+              maxItems: BATCH_LIMIT,
+              items: {
+                allOf: [ref(upsertInput), { type: 'object', required: ['externalId'], properties: { externalId: { type: 'string', maxLength: 255 } } }],
+              },
+            },
+          },
+        }),
+        responses: {
+          ...ok('Результат по каждой записи', {
+            type: 'object',
+            required: ['items'],
+            properties: { items: { type: 'array', items: ref('WriteResult') } },
+          }),
+          ...writeErrors,
+        },
+      }),
     },
     [`${list.path}/properties`]: {
       get: {
@@ -313,11 +515,13 @@ function extraPaths(lists: SpecList[]): Record<string, Schema> {
   return paths;
 }
 
-const INTRO = `Данные сайта из SparkPanel — только чтение.
+const INTRO = `Данные сайта из SparkPanel: чтение для сайта и запись для интеграций — учётной системы, склада, CRM.
 
-**Ключ.** Каждый запрос — с заголовком \`${API_KEY_HEADER}\`. Ключи создаются в панели: «Настройки → API».
+**Ключ.** Каждый запрос — с заголовком \`${API_KEY_HEADER}\`. Ключи создаются в панели: «Настройки → API». Читает любой ключ; пишет ключ с правом записи и только в списки, которые ему разрешили (иначе 403).
 
-**Методы.** У каждого списка одни и те же: записи (\`/items\`), запись (\`/items/{idOrCode}\`), свойства (\`/properties\`) и фасеты для фильтра (\`/facets\`).
+**Методы.** У каждого списка одни и те же: записи (\`/items\`), запись (\`/items/{idOrCode}\` и \`/items/external/{externalId}\`), свойства (\`/properties\`) и фасеты для фильтра (\`/facets\`).
+
+**Запись.** Создать — \`POST /items\`, изменить — \`PATCH /items/{idOrCode}\`, удалить — \`DELETE\`. Интеграции удобнее внешний ID — номер записи в её системе: \`PUT /items/external/{externalId}\` заводит запись или правит существующую, \`POST /items/batch\` делает то же пакетом до ${BATCH_LIMIT} записей. Тело — \`{ fields, properties }\`: свойства по коду, «Список» — кодом или номером варианта, привязка — номером, кодом или \`{ "externalId": "…" }\`, файл — номером загруженного файла. \`null\` стирает значение, неприсланное не трогается. Записанное сразу публикуется; проверки и журнал — те же, что в панели.
 
 **Свойства** приходят объектом \`properties\` по коду свойства: «Список» — кодом варианта, файл и изображение — объектом \`File\`, привязка — объектом \`Link\`. Скрытые свойства не отдаются.
 
@@ -329,7 +533,13 @@ const INTRO = `Данные сайта из SparkPanel — только чтен
 
 **Типы для сайта:** \`npx openapi-typescript <адрес этой спецификации> -o spark-api.d.ts\`.
 
-Ошибки: 400 — непонятный параметр, 401 — нет ключа или он отозван, 404 — нет записи.`;
+Ошибки: 400 — непонятный параметр или значение, 401 — нет ключа или он отозван, 403 — ключу нельзя писать сюда, 404 — нет записи, 409 — занято (код, внешний ID) или запись защищена.`;
+
+/** Имя схемы тела записи списка. */
+const inputSchemaName = (list: ApiList): string => `${list.schema}Input`;
+
+/** Имя схемы тела upsert и строки пакета — без внешнего ID в `fields`. */
+const upsertSchemaName = (list: ApiList): string => `${list.schema}Upsert`;
 
 const SHARED_SCHEMAS: Record<string, Schema> = {
   File: {
@@ -397,6 +607,41 @@ const SHARED_SCHEMAS: Record<string, Schema> = {
       total: { type: 'integer', description: 'Элементов в типе' },
     },
   },
+  LinkInput: {
+    anyOf: [
+      { type: 'integer', description: 'Номер записи' },
+      { type: 'string', description: 'Символьный код записи' },
+      {
+        type: 'object',
+        properties: {
+          id: { type: 'integer' },
+          code: { type: 'string' },
+          externalId: { type: 'string', description: 'Внешний ID записи' },
+        },
+        description: 'Одно из: id, code, externalId',
+      },
+    ],
+    description: 'Привязка: номер, код или { "externalId": "…" } записи',
+  },
+  DomainGroupInput: {
+    type: 'object',
+    required: ['domainIds', 'value'],
+    properties: {
+      domainIds: { type: ['array', 'null'], items: { type: 'integer' }, description: 'Номера доменов; null — общее значение' },
+      exceptDomainIds: { type: 'array', items: { type: 'integer' }, description: 'У общего значения — домены-исключения' },
+      value: { description: 'Значение для этих доменов' },
+    },
+  },
+  WriteResult: {
+    type: 'object',
+    required: ['externalId', 'id', 'status'],
+    properties: {
+      externalId: { type: ['string', 'null'], description: 'Внешний ID записи' },
+      id: { type: ['integer', 'null'], description: 'Номер записи в панели; у ошибки пакета — null' },
+      status: { type: 'string', enum: ['created', 'updated', 'error'] },
+      error: { type: 'string', description: 'Текст ошибки — у status: error' },
+    },
+  },
   Error: {
     type: 'object',
     properties: { statusCode: { type: 'integer' }, message: { type: 'string' } },
@@ -437,10 +682,18 @@ export function buildSpec({ serverUrl, siteName, lists }: { serverUrl: string; s
       responses: {
         Unauthorized: { description: 'Нет ключа или он отозван', content: { 'application/json': { schema: ref('Error') } } },
         NotFound: { description: 'Нет записи', content: { 'application/json': { schema: ref('Error') } } },
+        BadRequest: { description: 'Не прошли проверки: поля, свойства, значения', content: { 'application/json': { schema: ref('Error') } } },
+        Forbidden: { description: 'Ключу не разрешена запись в этот список', content: { 'application/json': { schema: ref('Error') } } },
+        Conflict: {
+          description: 'Код или внешний ID уже заняты, запись защищена от удаления',
+          content: { 'application/json': { schema: ref('Error') } },
+        },
       },
       schemas: {
         ...SHARED_SCHEMAS,
         ...Object.fromEntries(lists.map((spec) => [spec.list.schema, recordSchema(spec, targets)])),
+        ...Object.fromEntries(lists.map((spec) => [inputSchemaName(spec.list), inputSchema(spec, false)])),
+        ...Object.fromEntries(lists.map((spec) => [upsertSchemaName(spec.list), inputSchema(spec, true)])),
       },
     },
   };

@@ -1,7 +1,7 @@
-import { BadRequestException, Injectable, OnApplicationBootstrap } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
-import { Transaction } from 'sequelize';
+import { Op, Transaction } from 'sequelize';
 import { Files } from '../files/files.model';
 import { Domains } from '../domains/domains.model';
 import { HistoryAction } from '../history/history.model';
@@ -36,6 +36,9 @@ import { InfoblockRecord } from './record.model';
 
 /** Ключ родителя в снимке журнала: совпадает с полем формы «Родитель». */
 const PARENT_SNAPSHOT_KEY = 'tree.parentId';
+
+/** Ключ внешнего ID в снимке журнала. */
+const EXTERNAL_ID_SNAPSHOT_KEY = 'externalId';
 
 /** Скрытое значение в журнале: видно, что его меняли, но не на что. */
 const HIDDEN_SNAPSHOT_VALUE = '••••••';
@@ -169,6 +172,45 @@ export class PropertyValuesService implements OnApplicationBootstrap {
   }
 
   /**
+   * Внешние ID записей списка: ключ записи → внешний ID. Записей без него
+   * здесь нет.
+   */
+  async externalIds(listKey: string): Promise<Map<string, string>> {
+    const settingsId = await this.settingsService.settingsId(resolveInfoblock(listKey).key);
+    if (settingsId === null) return new Map();
+    const records = await this.recordsRepo.findAll({
+      where: { settingsId, externalId: { [Op.ne]: null } },
+      attributes: ['recordKey', 'externalId'],
+    });
+    return new Map(records.map((record) => [record.recordKey, record.externalId as string]));
+  }
+
+  /**
+   * Запись списка по внешнему ID — запросом по индексу, без чтения списка:
+   * так ищет интеграция, у которой нет номеров панели. Нет такой — null.
+   */
+  async recordIdByExternalId(listKey: string, externalId: string): Promise<string | null> {
+    const settingsId = await this.settingsService.settingsId(resolveInfoblock(listKey).key);
+    if (settingsId === null) return null;
+    const record = await this.recordsRepo.findOne({
+      where: { settingsId, externalId },
+      attributes: ['recordKey'],
+    });
+    return record?.recordKey ?? null;
+  }
+
+  /** Внешний ID одной записи; нет — null. */
+  async externalIdOf(listKey: string, recordId: string): Promise<string | null> {
+    const settingsId = await this.settingsService.settingsId(resolveInfoblock(listKey).key);
+    if (settingsId === null) return null;
+    const record = await this.recordsRepo.findOne({
+      where: { settingsId, recordKey: recordId },
+      attributes: ['externalId'],
+    });
+    return record?.externalId ?? null;
+  }
+
+  /**
    * Значения одной записи — карточке, открытой не с текущей страницы таблицы
    * (из журнала). Нет записи или значений — пустой набор, а не 404: значения
    * есть у любой записи, просто незаполненные.
@@ -244,20 +286,8 @@ export class PropertyValuesService implements OnApplicationBootstrap {
       // Проверяем только присланное: обязательность у свойства, которого в теле
       // нет, ничего не значит — его значение осталось прежним
       const touched = touchedProperties(properties, dto.values ?? []);
-      // Значение из внешнего источника пишет только он сам — через MCP; из панели нельзя
-      if (!author.via) {
-        const external = touched.filter((property) => property.isExternal);
-        if (external.length) {
-          throw new BadRequestException(
-            external
-              .map(
-                (property) =>
-                  `Свойство «${property.name}» заполняется из внешнего источника — в панели его не правят`,
-              )
-              .join('; '),
-          );
-        }
-      }
+      const integrationError = integrationOnlyError(touched, dto.externalId !== undefined, author);
+      if (integrationError) throw new BadRequestException(integrationError);
       const { values, errors } = normalizeValues(
         touched,
         valuesByCode(properties, dto.values ?? []),
@@ -284,6 +314,9 @@ export class PropertyValuesService implements OnApplicationBootstrap {
       const stored = valuesMap(properties, beforeRows);
       const before = normalizeValues(touched, stored, false).values;
       const beforeParent = record?.parentId ?? null;
+      const beforeExternalId = record?.externalId ?? null;
+      const externalId =
+        dto.externalId === undefined ? beforeExternalId : await this.checkedExternalId(settingsId, recordId, dto.externalId, transaction);
 
       /**
        * Родителя трогаем, только если его прислали: у списка, где дерево своё
@@ -299,7 +332,7 @@ export class PropertyValuesService implements OnApplicationBootstrap {
       const saved =
         record ??
         (await this.recordsRepo.create({ settingsId, recordKey: recordId }, { transaction }));
-      await saved.update({ parentId }, { transaction });
+      await saved.update({ parentId, externalId }, { transaction });
 
       // Переписываем только присланные свойства: у остальных строки не трогаем
       const touchedIds = touched.map((property) => property.id as number);
@@ -316,7 +349,9 @@ export class PropertyValuesService implements OnApplicationBootstrap {
       // строка записи здесь, а страница записей берёт его, если оно позже
       // правки самой записи. Сохранили то же самое — времени не трогаем
       const isChanged =
-        parentId !== beforeParent || JSON.stringify(before) !== JSON.stringify(values);
+        parentId !== beforeParent ||
+        externalId !== beforeExternalId ||
+        JSON.stringify(before) !== JSON.stringify(values);
       if (isChanged) {
         saved.changed('updatedAt', true);
         await saved.save({ transaction });
@@ -336,12 +371,15 @@ export class PropertyValuesService implements OnApplicationBootstrap {
         transaction,
       });
 
+      // Внешний ID — в журнал, только если его присылали: иначе его там и не было
+      const withExternal = (snapshot: Record<string, unknown>, value: string | null) =>
+        dto.externalId === undefined ? snapshot : { ...snapshot, [EXTERNAL_ID_SNAPSHOT_KEY]: value };
       await this.recordHistory(
         userId,
         list,
         recordId,
-        snapshotOf(touched, before, isTree, beforeParent),
-        snapshotOf(touched, values, isTree, parentId),
+        withExternal(snapshotOf(touched, before, isTree, beforeParent), beforeExternalId),
+        withExternal(snapshotOf(touched, values, isTree, parentId), externalId),
         author,
         transaction,
       );
@@ -391,6 +429,27 @@ export class PropertyValuesService implements OnApplicationBootstrap {
       });
       return { removed };
     });
+  }
+
+  /**
+   * Внешний ID записи: пустой — стереть, занятый другой записью списка — 409.
+   * Уникальность держит и индекс базы; проверка здесь — ради понятного текста.
+   */
+  private async checkedExternalId(
+    settingsId: number,
+    recordId: string,
+    raw: string | null,
+    transaction: Transaction,
+  ): Promise<string | null> {
+    const externalId = raw?.trim() ?? '';
+    if (externalId === '') return null;
+    const taken = await this.recordsRepo.findOne({
+      where: { settingsId, externalId, recordKey: { [Op.ne]: recordId } },
+      attributes: ['recordKey'],
+      transaction,
+    });
+    if (taken) throw new ConflictException(`Внешний ID «${externalId}» уже у записи #${taken.recordKey}`);
+    return externalId;
   }
 
   /** Родитель записи: формат ключа и отсутствие кольца в дереве. */
@@ -525,6 +584,25 @@ export class PropertyValuesService implements OnApplicationBootstrap {
       transaction,
     });
   }
+}
+
+/**
+ * Что пишет только интеграция — внешнее API или MCP (у их правки есть `via`),
+ * а из панели не правится: свойства «Внешний источник» и внешний ID записи.
+ * Нарушено — текст ошибки, иначе null.
+ */
+export function integrationOnlyError(
+  touched: Pick<InfoblockPropertyDto, 'name' | 'isExternal'>[],
+  isExternalIdSent: boolean,
+  author: Pick<HistoryAuthor, 'via'>,
+): string | null {
+  if (author.via) return null;
+  if (isExternalIdSent) return 'Внешний ID задаёт только интеграция — через внешнее API или MCP';
+  const external = touched.filter((property) => property.isExternal);
+  if (external.length === 0) return null;
+  return external
+    .map((property) => `Свойство «${property.name}» заполняется из внешнего источника — в панели его не правят`)
+    .join('; ');
 }
 
 /**

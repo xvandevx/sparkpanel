@@ -5,7 +5,7 @@ import { resolveInfoblock } from '../infoblocks/settings/infoblock-kinds';
 
 /**
  * Какие списки панели видит ассистент и через какие маршруты разделов их
- * пишет. MCP ходит в те же маршруты, что и экраны панели (`panel-client.ts`),
+ * пишет. MCP ходит в те же маршруты, что и экраны панели (`common/panel-client.ts`),
  * поэтому здесь только адреса и подсказки о полях — проверки у разделов.
  *
  * Чего здесь нет, того ассистент не видит: пользователи, роли и хранилища —
@@ -36,41 +36,45 @@ const NAME: McpField = { key: 'name', note: 'Название, обязател�
 const CODE: McpField = { key: 'code', note: 'Символьный код: строчная латиница, цифры, дефис' };
 const ACTIVE: McpField = { key: 'isActive', note: 'Активна ли запись; неактивную сайт не видит' };
 const SORT: McpField = { key: 'sort', note: 'Сортировка, по умолчанию 500: меньше — выше' };
+const EXTERNAL: McpField = {
+  key: 'externalId',
+  note: 'Внешний ID — номер записи в системе-источнике, уникален в списке; "" или null — стереть. Пишется сразу, не в черновик',
+};
 
 const MCP_KINDS: Record<string, McpKind> = {
   pages: {
     path: () => '/infoblocks/pages',
-    fields: [PARENT, NAME, { ...CODE, note: `${CODE.note}; у вложенной страницы обязателен` }, ACTIVE, SORT],
+    fields: [PARENT, NAME, { ...CODE, note: `${CODE.note}; у вложенной страницы обязателен` }, ACTIVE, SORT, EXTERNAL],
     isOwnParent: true,
     canCreate: true,
   },
   [CONTENTS_LIST]: {
     path: () => '/infoblocks/contents',
-    fields: [PARENT, NAME, { ...CODE, note: `${CODE.note}; обязателен — по нему тип виден во внешнем API` }, ACTIVE, SORT],
+    fields: [PARENT, NAME, { ...CODE, note: `${CODE.note}; обязателен — по нему тип виден во внешнем API` }, ACTIVE, SORT, EXTERNAL],
     isOwnParent: true,
     canCreate: true,
   },
   [CONTENT_ITEMS_KIND]: {
     path: (contentId) => `/infoblocks/contents/${contentId}/items`,
-    fields: [PARENT, NAME, CODE, ACTIVE, SORT],
+    fields: [PARENT, NAME, CODE, ACTIVE, SORT, EXTERNAL],
     isOwnParent: true,
     canCreate: true,
   },
   [PRODUCTS_LIST]: {
     path: () => '/infoblocks/products',
-    fields: [NAME, CODE, ACTIVE, SORT],
+    fields: [NAME, CODE, ACTIVE, SORT, EXTERNAL],
     isOwnParent: false,
     canCreate: true,
   },
   [CATEGORIES_LIST]: {
     path: () => '/infoblocks/products/categories',
-    fields: [PARENT, NAME, CODE, ACTIVE, SORT],
+    fields: [PARENT, NAME, CODE, ACTIVE, SORT, EXTERNAL],
     isOwnParent: true,
     canCreate: true,
   },
   'file-sections': {
     path: () => '/infoblocks/files/sections',
-    fields: [PARENT, NAME, SORT],
+    fields: [PARENT, NAME, SORT, EXTERNAL],
     isOwnParent: true,
     canCreate: true,
   },
@@ -87,6 +91,7 @@ const MCP_KINDS: Record<string, McpKind> = {
       { key: 'name', note: 'Хост домена (farkop.ru) или только часть поддомена (ekb)' },
       ACTIVE,
       SORT,
+      EXTERNAL,
     ],
     isOwnParent: true,
     canCreate: true,

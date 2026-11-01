@@ -1,4 +1,5 @@
 export * from './api-key-dto';
+export * from './api-list-dto';
 export * from './backup-check-dto';
 export * from './backup-counts-dto';
 export * from './backup-dto';

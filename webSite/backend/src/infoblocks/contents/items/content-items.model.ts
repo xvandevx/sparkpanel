@@ -20,7 +20,11 @@ interface ContentItemCreationAttrs {
  */
 @Table({
   tableName: 'infoblock_contents_items',
-  indexes: [{ fields: ['userId', 'contentId'] }, { fields: ['parentId'] }],
+  indexes: [
+    { fields: ['userId', 'contentId'] },
+    { fields: ['parentId'] },
+    { name: 'infoblock_contents_items_content_code', fields: ['contentId', 'code'] },
+  ],
 })
 export class ContentItems extends Model<
   ContentItems,

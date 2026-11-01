@@ -7,7 +7,25 @@ import { CATEGORIES_LIST, PRODUCTS_LIST } from '../infoblocks/products/product-l
  */
 
 /** Поле записи раздела (не свойство): ключ в ответе и что оно значит. */
-export type RecordField = 'id' | 'code' | 'name' | 'parentId' | 'sort' | 'path' | 'address' | 'createdAt' | 'updatedAt';
+export type RecordField =
+  | 'id'
+  | 'externalId'
+  | 'code'
+  | 'name'
+  | 'parentId'
+  | 'sort'
+  | 'path'
+  | 'address'
+  | 'createdAt'
+  | 'updatedAt';
+
+/**
+ * Поле записи, которое пишут (`fields` в теле записи). Родителя можно задать
+ * и внешним ID (`parentExternalId`): интеграция строит дерево, не зная номеров
+ * панели. `externalId` в `fields` — только при создании и правке по номеру
+ * или коду: у записи по внешнему ID он уже в адресе.
+ */
+export type WriteField = 'name' | 'code' | 'isActive' | 'sort' | 'parentId' | 'parentExternalId' | 'externalId';
 
 export interface ApiList {
   /** Ключ списка панели: по нему читаются записи, свойства и значения */
@@ -23,10 +41,18 @@ export interface ApiList {
   fields: RecordField[];
   /** Поля, по которым ищет `search`, кроме номера */
   searchIn: RecordField[];
+  /** Поля записи, которые принимает запись через API */
+  writeFields: WriteField[];
 }
 
-const RECORD: RecordField[] = ['id', 'code', 'name', 'sort', 'createdAt', 'updatedAt'];
-const TREE_RECORD: RecordField[] = ['id', 'code', 'name', 'parentId', 'sort', 'createdAt', 'updatedAt'];
+/** Больше записей в одном пакете записи не принимаем: пакет идёт одним запросом. */
+export const BATCH_LIMIT = 500;
+
+const RECORD: RecordField[] = ['id', 'externalId', 'code', 'name', 'sort', 'createdAt', 'updatedAt'];
+const TREE_RECORD: RecordField[] = ['id', 'externalId', 'code', 'name', 'parentId', 'sort', 'createdAt', 'updatedAt'];
+
+const WRITE: WriteField[] = ['externalId', 'name', 'code', 'isActive', 'sort'];
+const TREE_WRITE: WriteField[] = [...WRITE, 'parentId', 'parentExternalId'];
 
 export const PAGES_API: ApiList = {
   listKey: 'pages',
@@ -36,6 +62,7 @@ export const PAGES_API: ApiList = {
   schema: 'Page',
   fields: [...TREE_RECORD, 'path'],
   searchIn: ['name', 'code', 'path'],
+  writeFields: TREE_WRITE,
 };
 
 export const DOMAINS_API: ApiList = {
@@ -44,8 +71,9 @@ export const DOMAINS_API: ApiList = {
   group: 'Сайт',
   name: 'Домены',
   schema: 'Domain',
-  fields: ['id', 'name', 'address', 'parentId', 'sort', 'createdAt', 'updatedAt'],
+  fields: ['id', 'externalId', 'name', 'address', 'parentId', 'sort', 'createdAt', 'updatedAt'],
   searchIn: ['name', 'address'],
+  writeFields: ['externalId', 'name', 'isActive', 'sort', 'parentId', 'parentExternalId'],
 };
 
 /** Списки с постоянным адресом. Порядок — порядок разделов в документации. */
@@ -59,6 +87,7 @@ export const FIXED_LISTS: ApiList[] = [
     schema: 'Product',
     fields: RECORD,
     searchIn: ['name', 'code'],
+    writeFields: WRITE,
   },
   {
     listKey: CATEGORIES_LIST,
@@ -68,6 +97,7 @@ export const FIXED_LISTS: ApiList[] = [
     schema: 'Category',
     fields: TREE_RECORD,
     searchIn: ['name', 'code'],
+    writeFields: TREE_WRITE,
   },
   DOMAINS_API,
 ];
@@ -81,4 +111,5 @@ export const contentApiList = (listKey: string, code: string, name: string): Api
   schema: 'Content_' + code.replace(/[^a-zA-Z0-9]/g, '_'),
   fields: TREE_RECORD,
   searchIn: ['name', 'code'],
+  writeFields: TREE_WRITE,
 });

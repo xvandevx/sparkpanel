@@ -158,3 +158,19 @@ export function useRecordValues(listKey: string, recordId: string | null): boole
 
 /** Отказ в действии, которого Api списка не умеет. */
 const refuse = (text: string): Promise<never> => Promise.reject(new Error(text));
+
+/**
+ * Внешний ID записи — со страницы записей в сторе, а не из открытой карточки:
+ * карточка держит строку, с которой открылась, и та бывает строкой полного
+ * списка раздела, где внешнего ID нет (его отдаёт только страница записей).
+ * Нет на странице — пусто: показывать нечего.
+ */
+export function useExternalId(listKey: string, recordId: string): string {
+  const items = useSelector((state: RootState) => state.contentEditorNew[listKey]?.page?.items);
+  return useMemo(() => {
+    const row = (items ?? []).find((item) => String((item as { id?: unknown }).id) === recordId) as
+      | { externalId?: unknown }
+      | undefined;
+    return typeof row?.externalId === 'string' ? row.externalId : '';
+  }, [items, recordId]);
+}

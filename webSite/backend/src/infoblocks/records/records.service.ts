@@ -94,23 +94,26 @@ export class RecordsService {
   /**
    * Записи списка, как их отдаёт раздел, — с его вычисляемыми полями
    * (`isBlocked`): резервным копиям, чтобы не удалить защищённую запись.
+   * Плюс внешний ID: он есть у записи любого списка, но живёт не в таблице
+   * раздела, а в строке записи у `values/`.
    */
   async rows(listKey: string): Promise<PageRow[]> {
     const { key, kind } = resolveInfoblock(listKey);
     const load = this.loaders[kind];
     if (!load) throw new BadRequestException(`У списка ${key} нет страницы записей`);
-    return load(Number(key.split('.')[1] ?? 0));
+    const [rows, externalIds] = await Promise.all([
+      load(Number(key.split('.')[1] ?? 0)),
+      this.values.externalIds(key),
+    ]);
+    return rows.map((row) => ({ ...row, externalId: externalIds.get(String(row.id)) ?? null }));
   }
 
   async page(listKey: string, query: RecordsPageQueryDto): Promise<RecordsPageDto> {
-    const { key, kind } = resolveInfoblock(listKey);
-    const owner = Number(key.split('.')[1] ?? 0);
-    const load = this.loaders[kind];
-    if (!load) throw new BadRequestException(`У списка ${key} нет страницы записей`);
+    const { key } = resolveInfoblock(listKey);
     const filters = parseFilters(query.filters);
 
     const [loaded, { properties }, stored, editedAt, drafts] = await Promise.all([
-      load(owner),
+      this.rows(key),
       this.settings.settingsOf(key),
       this.values.findAll(key),
       this.values.editedAt(key),

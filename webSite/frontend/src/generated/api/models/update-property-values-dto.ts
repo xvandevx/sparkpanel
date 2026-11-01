@@ -35,5 +35,11 @@ export interface UpdatePropertyValuesDto {
      * @memberof UpdatePropertyValuesDto
      */
     'parentId'?: string | null;
+    /**
+     * Внешний ID записи — номер в системе-источнике, уникален в списке; пустой или null — стереть. Задаёт только интеграция (внешнее API, MCP): из панели — 400. Не прислали — остаётся прежним
+     * @type {string}
+     * @memberof UpdatePropertyValuesDto
+     */
+    'externalId'?: string | null;
 }
 

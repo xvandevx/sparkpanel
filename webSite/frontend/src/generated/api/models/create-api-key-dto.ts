@@ -26,5 +26,17 @@ export interface CreateApiKeyDto {
      * @memberof CreateApiKeyDto
      */
     'name': string;
+    /**
+     * Право записи; по умолчанию — только чтение
+     * @type {boolean}
+     * @memberof CreateApiKeyDto
+     */
+    'isWritable'?: boolean;
+    /**
+     * Куда ключ пишет — ключи списков из `GET /external-api/lists`; null или не прислали — во все
+     * @type {Array<string>}
+     * @memberof CreateApiKeyDto
+     */
+    'writeLists'?: Array<string> | null;
 }
 

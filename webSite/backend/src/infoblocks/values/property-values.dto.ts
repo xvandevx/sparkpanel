@@ -79,4 +79,16 @@ export class UpdatePropertyValuesDto {
   @IsString()
   @MaxLength(64)
   parentId?: string | null;
+
+  @ApiPropertyOptional({
+    example: '1C-000123',
+    nullable: true,
+    description:
+      'Внешний ID записи — номер в системе-источнике, уникален в списке; пустой или null — стереть. ' +
+      'Задаёт только интеграция (внешнее API, MCP): из панели — 400. Не прислали — остаётся прежним',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  externalId?: string | null;
 }

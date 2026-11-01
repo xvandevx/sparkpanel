@@ -7,7 +7,7 @@ import { McpPanelController } from './mcp-panel.controller';
 import { McpToolsService } from './mcp-tools.service';
 import { McpController } from './mcp.controller';
 import { McpService } from './mcp.service';
-import { PanelClient } from './panel-client';
+import { PanelClient } from '../common/panel-client';
 import { McpToken } from './tokens/mcp-token.model';
 import { McpTokenGuard } from './tokens/mcp-token.guard';
 import { McpTokensService } from './tokens/mcp-tokens.service';

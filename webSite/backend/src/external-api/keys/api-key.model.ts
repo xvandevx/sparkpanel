@@ -5,6 +5,8 @@ interface ApiKeyCreationAttrs {
   name: string;
   keyHash: string;
   keyTail: string;
+  isWritable?: boolean;
+  writeLists?: string[] | null;
 }
 
 /**
@@ -14,6 +16,10 @@ interface ApiKeyCreationAttrs {
  *
  * `userId` — кто создал ключ. Данные сайта общие: ключ открывает их все,
  * чей бы он ни был.
+ *
+ * Права задаются при создании и больше не меняются: ключ, ушедший в чужую
+ * систему, не получит больше, чем ему дали. Читает ключ всегда; пишет — если
+ * `isWritable`, и только в `writeLists` (ключи списков, null — во все).
  */
 @Table({
   tableName: 'api_keys',
@@ -39,4 +45,11 @@ export class ApiKey extends Model<ApiKey, ApiKeyCreationAttrs> {
 
   @Column({ type: DataType.DATE, allowNull: true })
   lastUsedAt: Date | null;
+
+  @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: false })
+  isWritable: boolean;
+
+  /** Куда ключ пишет: ключи списков (`products`, `content-items.3`); null — во все списки API */
+  @Column({ type: DataType.ARRAY(DataType.TEXT), allowNull: true })
+  writeLists: string[] | null;
 }

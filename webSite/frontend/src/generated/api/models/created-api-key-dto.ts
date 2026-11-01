@@ -51,6 +51,18 @@ export interface CreatedApiKeyDto {
      */
     'createdAt': string;
     /**
+     * Пишет ли ключ; читает он всегда
+     * @type {boolean}
+     * @memberof CreatedApiKeyDto
+     */
+    'isWritable': boolean;
+    /**
+     * Куда ключ пишет: ключи списков; null — во все списки API (или ключ только читает)
+     * @type {Array<string>}
+     * @memberof CreatedApiKeyDto
+     */
+    'writeLists': Array<string> | null;
+    /**
      * Ключ целиком; больше его не покажут
      * @type {string}
      * @memberof CreatedApiKeyDto
