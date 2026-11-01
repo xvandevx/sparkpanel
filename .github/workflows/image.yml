@@ -1,15 +1,16 @@
-# Образ SparkPanel (webSite/headless/Dockerfile).
-# Push в main и пулреквесты — только собрать: образ не сломан.
-# Тег версии v1.4.0 — собрать для amd64 и arm64 и выпустить в GHCR:
-#   ghcr.io/<владелец>/sparkpanel:1.4.0, :1.4, :1, :latest
+# Образ SparkPanel (webSite/headless/Dockerfile) собирается только намеренно:
+#   - тег версии: git tag v1.4.0 && git push origin v1.4.0 — собрать для amd64
+#     и arm64 и выпустить в GHCR: ghcr.io/<владелец>/sparkpanel:1.4.0, :1.4, :1, :latest
+#   - кнопка «Run workflow» во вкладке Actions — только собрать, ничего не выпуская
+#     (проверить, что образ не сломан)
+# Push в main и пулреквесты образ не трогают.
 # Docker Hub добавится вторым адресом в `images`, когда заведём аккаунт.
 name: image
 
 on:
   push:
-    branches: [main]
     tags: ['v*.*.*']
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read

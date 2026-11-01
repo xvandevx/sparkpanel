@@ -96,5 +96,5 @@ docker compose up -d --build
 
 Решено: первичная настройка остаётся как есть — главного администратора создаёт
 первый, кто откроет `/admin` (поставил — сразу зайди). Репозиторий публичный — `github.com/xvandevx/sparkpanel`, один на фронтенд и бэкенд, лицензия — BSL 1.1
-([`LICENSE`](../../LICENSE)). Образ выпускает `.github/workflows/image.yml` по тегу
-`v*.*.*` в GHCR (`ghcr.io/xvandevx/sparkpanel`), Docker Hub — вторым адресом позже.
+([`LICENSE`](../../LICENSE)). Образ выпускает `.github/workflows/image.yml` только по тегу
+`v*.*.*` (или кнопкой «Run workflow» — собрать без выпуска) в GHCR (`ghcr.io/xvandevx/sparkpanel`), Docker Hub — вторым адресом позже.
