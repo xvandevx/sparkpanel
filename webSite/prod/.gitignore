@@ -1,6 +1,6 @@
 .env
 docker/postgres/
-docker/minio/
+docker/uploads/
 docker/backups/
 docker/nginx/log/*
 !docker/nginx/log/.gitkeep

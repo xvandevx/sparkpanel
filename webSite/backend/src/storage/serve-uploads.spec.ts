@@ -1,91 +1,55 @@
 import * as express from 'express';
-import { Readable } from 'stream';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import * as request from 'supertest';
-import { objectKey, uploadsHandler } from './serve-uploads';
-
-describe('objectKey', () => {
-  it('берёт ключ из пути', () => {
-    expect(objectKey('/00/00/78/otchet.pdf')).toBe('00/00/78/otchet.pdf');
-  });
-
-  it('не выпускает за пределы ключей панели', () => {
-    expect(objectKey('/../secret')).toBeNull();
-    expect(objectKey('/00/%2e%2e/x.png')).toBeNull();
-    expect(objectKey('/00/..%2F..%2Fx.png')).toBeNull();
-    expect(objectKey('/00//x.png')).toBeNull();
-    expect(objectKey('/')).toBeNull();
-    expect(objectKey('/%E0%A4%A')).toBeNull();
-  });
-});
+import { uploadsHandler } from './serve-uploads';
 
 describe('uploadsHandler', () => {
-  const object = (overrides = {}) => ({
-    Body: Readable.from([Buffer.from('hello')]),
-    ContentType: 'text/html',
-    ContentLength: 5,
-    ContentDisposition: 'attachment; filename="a.html"',
-    CacheControl: 'public, max-age=31536000, immutable',
-    ETag: '"abc"',
-    ...overrides,
-  });
-  const appWith = (read: jest.Mock) => express().use('/uploads', uploadsHandler({ read } as never));
+  const root = mkdtempSync(join(tmpdir(), 'uploads-'));
+  const dir = join(root, 'uploads');
+  mkdirSync(join(dir, '00/00/01'), { recursive: true });
+  writeFileSync(join(dir, '00/00/01/photo.png'), 'png-bytes');
+  writeFileSync(join(dir, '00/00/01/logo.svg'), '<svg onload="alert(1)"/>');
+  writeFileSync(join(root, 'secret.txt'), 'top-secret-content');
 
-  it('отдаёт объект с заголовками, записанными при загрузке', async () => {
-    const read = jest.fn().mockResolvedValue(object());
-    const res = await request(appWith(read)).get('/uploads/00/00/01/a.html');
+  const app = express().use('/uploads', uploadsHandler(dir));
 
-    expect(read).toHaveBeenCalledWith('00/00/01/a.html', expect.any(Object));
+  it('картинку показывает, с типом по расширению и вечным кэшем', async () => {
+    const res = await request(app).get('/uploads/00/00/01/photo.png');
+
     expect(res.status).toBe(200);
-    expect(res.text).toBe('hello');
-    expect(res.headers['content-type']).toBe('text/html');
-    expect(res.headers['content-disposition']).toBe('attachment; filename="a.html"');
+    expect(res.headers['content-type']).toBe('image/png');
+    expect(res.headers['content-disposition']).toMatch(/^inline; filename="photo.png"/);
     expect(res.headers['cache-control']).toBe('public, max-age=31536000, immutable');
     expect(res.headers['x-content-type-options']).toBe('nosniff');
   });
 
-  it('часть файла — 206, диапазон уходит в хранилище', async () => {
-    const read = jest.fn().mockResolvedValue(
-      object({
-        Body: Readable.from([Buffer.from('el')]),
-        ContentLength: 2,
-        ContentRange: 'bytes 1-2/5',
-      }),
-    );
-    const res = await request(appWith(read))
-      .get('/uploads/00/00/01/a.mp4')
-      .set('Range', 'bytes=1-2');
+  it('svg отдаёт на скачивание: в нём бывает скрипт', async () => {
+    const res = await request(app).get('/uploads/00/00/01/logo.svg');
 
-    expect(read.mock.calls[0][1].range).toBe('bytes=1-2');
-    expect(res.status).toBe(206);
-    expect(res.headers['content-range']).toBe('bytes 1-2/5');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toMatch(/^attachment;/);
   });
 
-  it('ответы хранилища «не изменился» и «нет такого» передаёт, остальное — 502', async () => {
-    const failing = (status: number) =>
-      jest.fn().mockRejectedValue(
-        Object.assign(new Error('s3'), {
-          $metadata: { httpStatusCode: status },
-        }),
-      );
+  it('часть файла — 206, повтор по ETag — 304', async () => {
+    const part = await request(app).get('/uploads/00/00/01/photo.png').set('Range', 'bytes=0-2');
+    expect(part.status).toBe(206);
+    expect(part.headers['content-range']).toBe('bytes 0-2/9');
 
-    expect((await request(appWith(failing(304))).get('/uploads/00/00/01/a.png')).status).toBe(304);
-    expect((await request(appWith(failing(404))).get('/uploads/00/00/01/a.png')).status).toBe(404);
-    expect((await request(appWith(failing(403))).get('/uploads/00/00/01/a.png')).status).toBe(502);
+    const full = await request(app).get('/uploads/00/00/01/photo.png');
+    const same = await request(app)
+      .get('/uploads/00/00/01/photo.png')
+      .set('If-None-Match', full.headers.etag);
+    expect(same.status).toBe(304);
   });
 
-  it('по чужому пути в хранилище не ходит', async () => {
-    const read = jest.fn();
-    const res = await request(appWith(read)).get('/uploads/00/%2e%2e/%2e%2e/etc/passwd');
+  it('за пределы папки и в список файлов не пускает', async () => {
+    const outside = await request(app).get('/uploads/..%2fsecret.txt');
+    const listing = await request(app).get('/uploads/00/00/01/');
 
-    expect(res.status).toBe(404);
-    expect(read).not.toHaveBeenCalled();
-  });
-
-  it('другие методы пропускает дальше', async () => {
-    const read = jest.fn();
-    const res = await request(appWith(read)).post('/uploads/00/00/01/a.png');
-
-    expect(res.status).toBe(404);
-    expect(read).not.toHaveBeenCalled();
+    expect(outside.status).toBe(404);
+    expect(outside.text).not.toContain('top-secret-content');
+    expect(listing.status).toBe(404);
   });
 });

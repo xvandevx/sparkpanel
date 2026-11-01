@@ -1,17 +1,15 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-  CreateBucketCommand,
   DeleteObjectCommand,
-  GetObjectCommand,
-  GetObjectCommandOutput,
   HeadBucketCommand,
-  PutBucketPolicyCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import { mkdir, unlink, writeFile } from 'fs/promises';
+import { dirname, resolve, sep } from 'path';
 
-/** Где лежит файл: во встроенном MinIO панели или во внешнем S3 из настроек сайта. */
+/** Где лежит файл: во встроенной папке панели или во внешнем S3 из настроек сайта. */
 export enum StorageKind {
   Builtin = 'builtin',
   External = 'external',
@@ -33,61 +31,48 @@ export type StorageTarget =
   | { kind: StorageKind.Builtin }
   | { kind: StorageKind.External; config: S3Config };
 
-/** Условия чтения объекта — заголовки запроса браузера, как пришли. */
-export interface ReadConditions {
-  range?: string;
-  ifNoneMatch?: string;
-  ifModifiedSince?: string;
-}
+/** Адрес файлов встроенного хранилища — относительный, с того же origin, что панель. */
+export const UPLOADS_PATH = '/uploads';
 
 /**
- * Файловое хранилище панели — S3. Встроенное — MinIO из docker-compose: его
- * адрес и ключи в env, бакет бэкенд заводит сам, а файлы видны по
- * `/uploads/<ключ>` с того же origin: локально и на нашем проде их отдаёт
- * nginx, в образе headless — сама панель (`serve-uploads.ts`). Внешнее
- * задают в настройках сайта: бакет там чужой, его не создаём и прав на нём
- * не меняем — только кладём и убираем объекты.
+ * Файловое хранилище панели. Встроенное — папка на диске (`UPLOADS_DIR`,
+ * по умолчанию `uploads/` рядом с бэкендом, в образе — том `/data/uploads`):
+ * файл лежит по своему ключу (`00/00/78/otchet.pdf`), а отдаёт его сама панель
+ * по `/uploads/<ключ>` (`serve-uploads.ts`). Внешнее — S3 из настроек сайта:
+ * бакет там чужой, его не создаём и прав на нём не меняем — только кладём
+ * и убираем объекты.
  *
- * Сервис знает только про объекты: положить, прочитать, удалить, сказать адрес.
+ * Сервис знает только про объекты: положить, удалить, сказать адрес.
  * Что за файл лежит по ключу — забота модуля `files/`.
  */
 @Injectable()
 export class StorageService implements OnModuleInit {
   private readonly logger = new Logger(StorageService.name);
-  private readonly builtin: S3Client;
-  private readonly bucket: string;
-  private readonly publicPrefix: string;
 
-  /** Обещание готовности бакета; при неудаче сбрасывается — следующая загрузка попробует снова. */
-  private ready: Promise<void> | null = null;
+  /** Папка встроенного хранилища, абсолютный путь */
+  readonly uploadsDir: string;
 
   constructor(config: ConfigService) {
-    this.bucket = config.get<string>('S3_BUCKET') ?? 'copanel-media';
-    this.publicPrefix = (config.get<string>('S3_PUBLIC_PREFIX') ?? '/uploads').replace(/\/+$/, '');
-
-    this.builtin = s3Client({
-      endpoint: config.get<string>('S3_ENDPOINT') ?? 'http://localhost:3404',
-      region: config.get<string>('S3_REGION') ?? 'us-east-1',
-      accessKey: config.get<string>('S3_ACCESS_KEY') ?? 'minioadmin',
-      secretKey: config.get<string>('S3_SECRET_KEY') ?? 'minioadmin',
-    });
+    this.uploadsDir = resolve(config.get<string>('UPLOADS_DIR') ?? 'uploads');
   }
 
   /**
-   * Бакет готовим на старте, но падение здесь не роняет приложение: хранилище
-   * может подняться позже панели, а без него работают все остальные разделы.
+   * Папку заводим на старте, но падение здесь не роняет приложение: без неё
+   * работают все разделы, кроме загрузки файлов, — та скажет о причине сама.
    */
   async onModuleInit(): Promise<void> {
     try {
-      await this.ensureBucket();
+      await mkdir(this.uploadsDir, { recursive: true });
     } catch (error) {
-      this.logger.warn(
-        `Хранилище недоступно (${describe(error)}). Попробую снова при первой загрузке файла.`,
-      );
+      this.logger.warn(`Папка файлов ${this.uploadsDir} недоступна: ${describe(error)}`);
     }
   }
 
-  /** Кладёт объект; адрес, по которому его откроет браузер, — `url()`. */
+  /**
+   * Кладёт объект; адрес, по которому его откроет браузер, — `url()`.
+   * Тип и «показать или скачать» во внешнем хранилище пишутся в объект —
+   * S3 отдаёт их как есть; встроенное решает это при отдаче, по расширению.
+   */
   async put(
     target: StorageTarget,
     key: string,
@@ -95,9 +80,17 @@ export class StorageService implements OnModuleInit {
     contentType: string,
     disposition: string,
   ): Promise<void> {
-    const command = (bucket: string) =>
+    if (target.kind === StorageKind.Builtin) {
+      const path = this.pathOf(key);
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, body);
+      return;
+    }
+
+    const { config } = target;
+    await s3Client(config).send(
       new PutObjectCommand({
-        Bucket: bucket,
+        Bucket: config.bucket,
         Key: key,
         Body: body,
         ContentType: contentType,
@@ -106,16 +99,8 @@ export class StorageService implements OnModuleInit {
         ContentDisposition: disposition,
         // Имя объекта уникально, содержимое не переписывается — можно кэшировать надолго
         CacheControl: 'public, max-age=31536000, immutable',
-      });
-
-    if (target.kind === StorageKind.Builtin) {
-      await this.ensureBucket();
-      await this.builtin.send(command(this.bucket));
-      return;
-    }
-
-    const { config } = target;
-    await s3Client(config).send(command(config.bucket));
+      }),
+    );
   }
 
   /**
@@ -125,40 +110,16 @@ export class StorageService implements OnModuleInit {
    */
   url(target: StorageTarget, key: string): string {
     return target.kind === StorageKind.Builtin
-      ? `${this.publicPrefix}/${key}`
+      ? `${UPLOADS_PATH}/${key}`
       : externalUrl(target.config, key);
   }
 
-  /**
-   * Путь, по которому панель отдаёт встроенное хранилище сама (`/uploads`).
-   * `S3_PUBLIC_PREFIX` задан полным адресом (CDN перед бакетом) — null:
-   * браузер ходит туда, панели раздавать нечего.
-   */
-  get servedPath(): string | null {
-    return this.publicPrefix.startsWith('/') ? this.publicPrefix : null;
-  }
-
-  /**
-   * Объект встроенного хранилища — для раздачи по `servedPath`. Range
-   * и условные заголовки уходят в хранилище как есть: часть файла (206)
-   * и «не изменился» (304) решает оно, 304 приходит ошибкой SDK.
-   */
-  read(key: string, conditions: ReadConditions): Promise<GetObjectCommandOutput> {
-    const since = conditions.ifModifiedSince ? new Date(conditions.ifModifiedSince) : null;
-    return this.builtin.send(
-      new GetObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-        Range: conditions.range,
-        IfNoneMatch: conditions.ifNoneMatch,
-        IfModifiedSince: since && !isNaN(since.getTime()) ? since : undefined,
-      }),
-    );
-  }
-
+  /** Убирает объект; во встроенном хранилище файла уже нет — не ошибка. */
   async remove(target: StorageTarget, key: string): Promise<void> {
     if (target.kind === StorageKind.Builtin) {
-      await this.builtin.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
+      await unlink(this.pathOf(key)).catch((error) => {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      });
       return;
     }
     const { config } = target;
@@ -175,40 +136,15 @@ export class StorageService implements OnModuleInit {
   }
 
   /**
-   * Встроенный бакет заводится сам при первом обращении и открывается на
-   * анонимное чтение: nginx отдаёт из него картинки сайту без токена (панель
-   * в образе headless читает своими ключами). Открывается ровно
-   * `s3:GetObject` — права на список объектов не выдаются, перебрать содержимое
-   * бакета нельзя.
+   * Файл ключа в папке хранилища. Ключи собирает панель (`files/file-key.ts`),
+   * но выйти за пределы папки не даём и им: путь сверяется после разрешения.
    */
-  private ensureBucket(): Promise<void> {
-    if (this.ready) return this.ready;
-
-    this.ready = (async () => {
-      if (!(await this.bucketExists())) {
-        await this.builtin.send(new CreateBucketCommand({ Bucket: this.bucket }));
-        this.logger.log(`Создан бакет ${this.bucket}`);
-      }
-      await this.builtin.send(
-        new PutBucketPolicyCommand({ Bucket: this.bucket, Policy: publicReadPolicy(this.bucket) }),
-      );
-    })().catch((error) => {
-      this.ready = null;
-      throw error;
-    });
-
-    return this.ready;
-  }
-
-  private async bucketExists(): Promise<boolean> {
-    try {
-      await this.builtin.send(new HeadBucketCommand({ Bucket: this.bucket }));
-      return true;
-    } catch (error) {
-      // Бакета нет — создадим; всё остальное (нет сети, неверные ключи) наверх
-      if (isNotFound(error)) return false;
-      throw error;
+  private pathOf(key: string): string {
+    const path = resolve(this.uploadsDir, key);
+    if (!path.startsWith(this.uploadsDir + sep)) {
+      throw new Error(`Ключ ${key} ведёт за пределы папки файлов`);
     }
+    return path;
   }
 }
 
@@ -232,24 +168,5 @@ const externalUrl = (config: S3Config, key: string): string => {
   return `${base}/${key}`;
 };
 
-const isNotFound = (error: unknown): boolean => {
-  const status = (error as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
-  const name = (error as { name?: string })?.name;
-  return status === 404 || name === 'NotFound' || name === 'NoSuchBucket';
-};
-
 export const describe = (error: unknown): string =>
   error instanceof Error ? error.message || error.name : String(error);
-
-const publicReadPolicy = (bucket: string): string =>
-  JSON.stringify({
-    Version: '2012-10-17',
-    Statement: [
-      {
-        Effect: 'Allow',
-        Principal: { AWS: ['*'] },
-        Action: ['s3:GetObject'],
-        Resource: [`arn:aws:s3:::${bucket}/*`],
-      },
-    ],
-  });

@@ -50,14 +50,14 @@ docker compose up -d
 `ghcr.io/xvandevx/sparkpanel` (`:latest`, `:1`, `:1.4.0`); закрепить версию —
 `SPARKPANEL_VERSION` в `.env`.
 
-Панель и API — один образ на одном порту, рядом Postgres и MinIO. Для HTTPS поставьте
+Панель и API — один образ на одном порту, рядом Postgres. Загруженные файлы лежат
+папкой в томе, их отдаёт сама панель; S3 можно подключить в настройках. Для HTTPS поставьте
 перед панелью любой прокси (Caddy, Traefik, nginx).
 Подробности — [webSite/headless/README.md](webSite/headless/README.md).
 
 ## Планы
 
 - Права по ролям
-- Файлы встроенного хранилища в образе без nginx
 - Вебхуки на публикацию
 - Английский интерфейс
 

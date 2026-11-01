@@ -105,8 +105,7 @@ focuzy, `3000` — ещё один проект, оба разрабатываю
 | API | `http://localhost:3400/api` → nginx → NestJS (:3402) |
 | Swagger | `http://localhost:3400/api/docs` (JSON: `/api/docs-json`) |
 | Postgres | `localhost:3403` (внутри контейнера 5432) |
-| Файлы медиатеки | `http://localhost:3400/uploads/...` → nginx → MinIO, бакет `copanel-media` |
-| MinIO | S3 API `localhost:3404`, веб-консоль `http://localhost:3405` (minioadmin / minioadmin) |
+| Файлы медиатеки | `http://localhost:3400/uploads/...` → nginx → NestJS → папка `backend/uploads` |
 
 **Почему именно через nginx, а не по портам напрямую:**
 
@@ -120,9 +119,6 @@ focuzy, `3000` — ещё один проект, оба разрабатываю
 - Наружу postgres отдаётся на `3403` (5432 занят сторонним сервисом, плюс держим весь стек
   на 340x) — `docker-compose.yml`. Внутри контейнера порт прежний (5432) — на проде ничего
   не меняется. nginx внутри контейнера тоже слушает 80, наружу публикуется как 3400.
-- **nginx не поднимется без контейнера minio:** имя `minio` в `location /uploads/` резолвится
-  при старте, и без него nginx падает с `host not found in upstream` — то есть уносит с собой
-  и панель. Поэтому в compose у nginx стоит `depends_on: minio`.
 - `pkill -f "nest start"` убивает только обёртку; дочерний node продолжает держать порт 3402
   и отвечать **старым кодом**. Гасить надо по порту: `lsof -ti:3402 | xargs kill -9`
   (это уже делает `scripts/stop.sh`).
@@ -356,9 +352,11 @@ Swagger на `/api/docs`.
   ключ списка `file-sections`), файлы — сам модуль (`infoblock_files`,
   `/api/infoblocks/files`, ключ `files.<номер раздела>`). У файла нет ни владельца
   (файлы общие на сайт), ни адреса в базе — адрес собирается из ключа объекта
-  и хранилища, а ключ — из номера файла и его кода: `00/00/78/voprosy-i-otvety.pdf`. `storage/` — обёртка над S3: встроенный MinIO из docker-compose или
-  внешнее хранилище из настроек; встроенное отдаёт по `/uploads/<ключ>` nginx, минуя
-  Node, а в образе headless, где nginx нет, — сама панель (`storage/serve-uploads.ts`); исполняемые типы (`.html`, `.svg`) — с `Content-Disposition: attachment`.
+  и хранилища, а ключ — из номера файла и его кода: `00/00/78/voprosy-i-otvety.pdf`. `storage/` — хранилище файлов: встроенное — папка на диске (`UPLOADS_DIR`,
+  локально `backend/uploads`, в образе — том `/data/uploads`), файл лежит по своему ключу;
+  внешнее — S3 из настроек. Встроенное отдаёт по `/uploads/<ключ>` сама панель
+  (`storage/serve-uploads.ts`; локально и на проде nginx передаёт ей этот путь), исполняемые
+  типы (`.html`, `.svg`) — с `Content-Disposition: attachment`, по расширению.
   Файл лежит в разделе (`sectionId`) или, загруженный через свойство «Файл»/«Изображение»,
   помнит свойство (`propertyId`, список `property-files.<номер>`). **Разделов свойств
   в базе нет**: раздел свойства (`property-<номер>`) и группу его списка с путём

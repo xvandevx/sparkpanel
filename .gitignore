@@ -4,7 +4,10 @@
 # локальные данные postgres
 /webSite/docker/postgres
 
-# локальные данные minio (загруженные файлы медиатеки)
+# загруженные файлы медиатеки (встроенное хранилище)
+/webSite/backend/uploads
+
+# данные прежнего локального minio — до переноса файлов в backend/uploads
 /webSite/docker/minio
 
 # секреты образа headless (шаблон — .env.example рядом)

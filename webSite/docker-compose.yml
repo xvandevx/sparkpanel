@@ -1,9 +1,9 @@
-# Локальный стек aiAdmin: nginx (:3400) + postgres (:3403) + minio (:3404 S3, :3405 консоль).
+# Локальный стек aiAdmin: nginx (:3400) + postgres (:3403).
 # Dev-серверы backend (:3402) и frontend (:3401) крутятся на ХОСТЕ, не в контейнерах,
-# поэтому nginx ходит к ним через host.docker.internal. minio — контейнер, к нему nginx
-# ходит по имени сервиса внутри compose-сети.
+# поэтому nginx ходит к ним через host.docker.internal. Файлы медиатеки лежат
+# папкой backend/uploads и отдаёт их бэкенд — отдельного хранилища в стеке нет.
 #
-#   docker compose up -d nginx postgres minio
+#   docker compose up -d nginx postgres
 #
 # Порты стека — 340x: 4000/4001/4010/4432 заняты проектом focuzy, 3000 — ещё одним проектом.
 
@@ -18,10 +18,6 @@ services:
             - "3400:80"
         volumes:
             - "./docker/nginx/conf.d:/etc/nginx/conf.d"
-        # nginx резолвит имя minio при старте (location /uploads/), поэтому контейнер
-        # должен существовать — иначе nginx не поднимется с "host not found in upstream".
-        depends_on:
-            - minio
         # Даёт контейнеру достучаться до dev-серверов, которые крутятся на хосте
         # (на Docker Desktop host.docker.internal есть из коробки, на Linux — нужен host-gateway)
         extra_hosts:
@@ -40,32 +36,3 @@ services:
             # aiAdmin живёт на портах 340x. Внутри контейнера порт прежний (5432) —
             # на проде ничего не меняется.
             - "3403:5432"
-
-    # S3-хранилище медиатеки (раздел «Файлы»). Бакет copanel-media заводит сам бэкенд
-    # при старте — он же открывает анонимное чтение объектов (s3:GetObject).
-    minio:
-        # Сборка сообщества (Pigsty), а не официальный образ: minio/minio с docker hub
-        # удалён, quay.io/minio/minio закрыт для анонимных pull'ов. Образ повторяет
-        # официальный — тот же entrypoint, root, mc внутри, — поэтому данные в
-        # ./docker/minio и healthcheck прежние. Версия закреплена: latest у сборки
-        # сообщества может уехать в несовместимую сторону без предупреждения.
-        image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
-        command: server /data --console-address ":9001"
-        volumes:
-            - "./docker/minio:/data"
-        environment:
-            # ТОЛЬКО для локальной разработки: minio доступен с хоста на 3404/3405.
-            # На проде креды приезжают из prod/.env (MINIO_ROOT_USER/MINIO_ROOT_PASSWORD).
-            MINIO_ROOT_USER: minioadmin
-            MINIO_ROOT_PASSWORD: minioadmin
-        ports:
-            # Внутри контейнера порты прежние (9000 S3 API / 9001 консоль) — как на проде.
-            # Наружу, по правилу 340x: бэкенд с хоста ходит на http://localhost:3404,
-            # веб-консоль — http://localhost:3405.
-            - "3404:9000"
-            - "3405:9001"
-        healthcheck:
-            test: ["CMD", "mc", "ready", "local"]
-            interval: 5s
-            timeout: 3s
-            retries: 20

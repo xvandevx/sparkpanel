@@ -14,7 +14,8 @@ log "Гашу backend (:3402) и frontend (:3401)"
 lsof -ti:3402 2>/dev/null | xargs kill -9 2>/dev/null || true
 lsof -ti:3401 2>/dev/null | xargs kill -9 2>/dev/null || true
 
-log "Останавливаю контейнеры (nginx, postgres, minio)"
-docker compose down 2>/dev/null || true
+log "Останавливаю контейнеры (nginx, postgres)"
+# --remove-orphans: заодно гасит контейнеры, которых в compose больше нет (прежний minio)
+docker compose down --remove-orphans 2>/dev/null || true
 
 printf "\033[32m✓ Всё остановлено\033[0m\n"

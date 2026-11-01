@@ -37,8 +37,7 @@ async function bootstrap() {
     .build();
   SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swaggerConfig));
 
-  // Файлы встроенного хранилища (/uploads/…) — из MinIO через панель.
-  // Локально и на проде их раньше перехватывает nginx
+  // Файлы встроенного хранилища (/uploads/…) — из его папки на диске
   serveUploads(app);
 
   // Образ headless: панель статикой с того же порта (webSite/headless/).

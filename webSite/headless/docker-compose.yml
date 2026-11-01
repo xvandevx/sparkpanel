@@ -1,5 +1,6 @@
-# SparkPanel целиком: панель (один образ) + Postgres + MinIO для файлов.
-# Файлы MinIO (/uploads/…) отдаёт сама панель — наружу MinIO не публикуется.
+# SparkPanel целиком: панель (один образ) + Postgres. Файлы — папка в томе
+# uploads, отдаёт их сама панель (/uploads/…); S3 при желании подключается
+# в панели, «Настройки → Хранилища».
 # Пример для того, кто ставит панель себе. Рядом — .env (шаблон .env.example).
 #
 #   docker compose up -d        → http://localhost:3000
@@ -29,10 +30,8 @@ services:
       # во внешнем API и `servers` его спецификации. Пусто — берётся из запроса
       PUBLIC_URL: ${PUBLIC_URL:-}
       PRIVATE_KEY: ${PRIVATE_KEY:?задайте PRIVATE_KEY в .env}
-      S3_ENDPOINT: http://minio:9000
-      S3_BUCKET: sparkpanel-media
-      S3_ACCESS_KEY: sparkpanel
-      S3_SECRET_KEY: ${S3_SECRET_KEY:?задайте S3_SECRET_KEY в .env}
+    volumes:
+      - uploads:/data/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -52,16 +51,6 @@ services:
       retries: 10
     restart: unless-stopped
 
-  minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
-    command: server /data
-    environment:
-      MINIO_ROOT_USER: sparkpanel
-      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
-    volumes:
-      - minio-data:/data
-    restart: unless-stopped
-
 volumes:
   postgres-data:
-  minio-data:
+  uploads:

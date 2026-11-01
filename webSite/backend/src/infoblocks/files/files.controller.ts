@@ -56,8 +56,8 @@ export class FilesController {
   @ApiBadRequestResponse({ description: 'Файл не передан, не указано куда, хранилище не приняло' })
   @ApiPayloadTooLargeResponse({ description: 'Файл больше 20 МБ' })
   @ApiNotFoundResponse({ description: 'Раздел или свойство не найдены' })
-  // Хранилище multer по умолчанию — память: файл уходит в S3 целиком и на диск
-  // бэкенда не попадает. Лимит здесь же — иначе 20-мегабайтный предел ловил бы
+  // Хранилище multer по умолчанию — память: файл целиком уходит в хранилище,
+  // временных копий на диске нет. Лимит здесь же — иначе 20-мегабайтный предел ловил бы
   // только nginx, а локальный запуск мимо него остался бы без ограничения
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_FILE_SIZE } }))
   @Post('upload')

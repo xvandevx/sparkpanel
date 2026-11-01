@@ -10,10 +10,10 @@ nginx-конфиги (`docker/nginx/`), инструмент выпуска SSL 
 которые собирает CI.
 
 Сервисы: nginx (80/443) → `frontend` (Next.js SSR, :3000) и `backend` (NestJS, :3010),
-`postgres` (только на петлевом интерфейсе), `minio` (S3-хранилище медиатеки, наружу не
-опубликовано), `dozzle` (UI логов, :9000).
+`postgres` (только на петлевом интерфейсе), `dozzle` (UI логов, :9000). Файлы медиатеки —
+папка `docker/uploads`, её монтирует `backend`.
 
-**Один origin.** `https://ai-panel.app/api/...` → backend, `/uploads/...` → minio,
+**Один origin.** `https://ai-panel.app/api/...` → backend, `/uploads/...` → тоже backend,
 всё остальное → frontend.
 Так задумано: Google OAuth-колбэк регистрируется на `https://ai-panel.app/api/auth/google/callback`,
 а бэкенд после логина редиректит на `/?token=...` **относительно** — верно только при одном origin.
@@ -24,10 +24,9 @@ nginx-конфиги (`docker/nginx/`), инструмент выпуска SSL 
 | Админка | `https://ai-panel.app` (`www` → 301 на apex) |
 | API | `https://ai-panel.app/api` |
 | Swagger | закрыт (404). Открывается в `docker/nginx/conf.d/ai-panel.conf` под basic-auth |
-| Файлы медиатеки | `https://ai-panel.app/uploads/<ключ>` — nginx отдаёт из бакета minio |
+| Файлы медиатеки | `https://ai-panel.app/uploads/<ключ>` — nginx передаёт backend, тот отдаёт из `docker/uploads` |
 | Логи контейнеров | `http://<SERVER_IP>:9000` (Dozzle) |
 | Postgres | `127.0.0.1:5432` на сервере, снаружи закрыт — только SSH-туннель |
-| Консоль MinIO | `127.0.0.1:9001` на сервере, снаружи закрыта — только SSH-туннель |
 
 ---
 
@@ -107,7 +106,7 @@ ssh -i ~/.ssh/aipanel_deploy deploy@<SERVER_IP> "docker ps"
 С рабочей машины, из `webSite/`:
 
 ```bash
-rsync -avz --exclude '.env' --exclude 'docker/postgres' --exclude 'docker/minio' ./prod/ deploy@<SERVER_IP>:/home/deploy/aipanel/
+rsync -avz --exclude '.env' --exclude 'docker/postgres' --exclude 'docker/uploads' ./prod/ deploy@<SERVER_IP>:/home/deploy/aipanel/
 ```
 
 Образы `ghcr.io/ai-panel/*` приватные — залогиниться в GHCR (PAT с `read:packages`):
@@ -163,6 +162,7 @@ openssl dhparam -out docker/nginx/certs/dhparam.pem 2048
 cd /home/deploy/aipanel
 cp .env.example .env
 nano .env                            # заполнить секреты (таблица ниже)
+mkdir -p docker/uploads && sudo chown 1001:1001 docker/uploads   # файлы медиатеки: пишет nestjs (uid 1001)
 
 docker compose config                # проверка конфига
 docker compose pull                  # подтянуть образы из GHCR
@@ -176,7 +176,6 @@ docker compose up -d
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | postgres + backend |
 | `PRIVATE_KEY` | backend — подпись JWT (`openssl rand -hex 32`) |
 | `JWT_EXPIRES_IN` | backend — срок жизни токена (по умолчанию `7d`) |
-| `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` | minio + backend (`S3_ACCESS_KEY`/`S3_SECRET_KEY` подставляет compose) |
 
 
 **Первый вход.** Регистрации в панели нет и администратор не задаётся через env: откройте
@@ -315,60 +314,34 @@ docker compose exec -T postgres pg_dump -U aipanel aipanel | gzip > ~/aipanel-$(
 scp deploy@<SERVER_IP>:~/aipanel-*.sql.gz ./
 ```
 
-### Файлы медиатеки (MinIO)
+### Файлы медиатеки
 
-Раздел «Файлы» хранит картинки и документы не в базе, а в S3-совместимом `minio`.
+Раздел «Файлы» хранит картинки и документы не в базе, а папкой на диске.
 
 | Что | Где |
 |-----|-----|
-| Данные (сами файлы) | `/home/deploy/aipanel/docker/minio` на сервере — **второй том с данными помимо postgres** |
-| Бакет | `copanel-media`, ключ объекта — `<userId>/<sectionId>/<hex>-<имя>.<ext>` |
-| S3 API | `http://minio:9000` — только внутренняя сеть, наружу не опубликован |
-| Публичные ссылки | `https://<домен>/uploads/<ключ>` — nginx проксирует в бакет (`location /uploads/`) |
-| Консоль | `127.0.0.1:9001` на сервере, снаружи закрыта |
+| Данные (сами файлы) | `/home/deploy/aipanel/docker/uploads` на сервере — **второй том с данными помимо postgres** |
+| В контейнере | `/data/uploads` (`UPLOADS_DIR` в образе бэкенда), владелец — uid 1001 (`nestjs`) |
+| Раскладка | файл лежит по своему ключу: `00/00/78/voprosy-i-otvety.pdf` (папки — из номера файла) |
+| Публичные ссылки | `https://<домен>/uploads/<ключ>` — nginx передаёт бэкенду (`location /uploads/`) |
 
-Бакет и политику анонимного чтения (`s3:GetObject`) создаёт **сам бэкенд при старте** —
-руками в консоли ничего заводить не нужно. Листинг бакета не открывается: `/uploads/`
-без ключа отдаёт 403.
+Отдаёт файлы сам бэкенд: тип по расширению, `.html`/`.svg` — только на скачивание, вечный
+кэш. Списка файлов папки по `/uploads/` нет. Ссылки, которые бэкенд отдаёт фронту,
+**относительные** (`/uploads/...`) — тот же origin, что и у панели.
 
-Ссылки, которые бэкенд отдаёт фронту, **относительные** (`/uploads/...`) — тот же origin,
-что и у панели. Публиковать minio отдельным портом или поддоменом не нужно и нельзя:
-это сломает правило одного origin, на котором держится вход.
+S3 при желании подключается в самой панели — «Настройки → Хранилища», новые файлы
+пойдут туда; уже загруженные остаются в папке.
 
-Настройки бэкенда (`S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_PUBLIC_PREFIX`) — не секреты
-и лежат в `docker-compose.yml`, у сервиса `backend`. Из `.env` берутся только креды
-(`MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD`, compose подставляет их в `S3_ACCESS_KEY`/`S3_SECRET_KEY`).
-
-**Консоль с рабочей машины** — через SSH-туннель, как и база:
-
-```bash
-ssh -N -L 9001:127.0.0.1:9001 deploy@<SERVER_IP>
-# затем http://127.0.0.1:9001, логин/пароль — MINIO_ROOT_USER / MINIO_ROOT_PASSWORD из .env
-```
-
-**Бэкап тома.** Дамп базы файлы **не** включает — их надо забирать отдельно:
+**Бэкап тома.** Дамп базы файлы **не** включает — их надо забирать отдельно, обычным архивом:
 
 ```bash
 cd /home/deploy/aipanel
-docker compose stop minio                                   # чтобы не поймать файл на середине записи
-sudo tar czf ~/aipanel-media-$(date +%F).tar.gz -C docker minio
-docker compose start minio
+sudo tar czf ~/aipanel-media-$(date +%F).tar.gz -C docker uploads
 ```
 
-Без остановки сервиса — тем же `mc` из образа minio, но копию надо писать в
-**примонтированную** снаружи папку (`docker/backups/` уже в `.gitignore`):
-
-```bash
-cd /home/deploy/aipanel
-set -a && . ./.env && set +a            # подхватить MINIO_ROOT_*
-docker run --rm --network aipanel_internal-network \
-  -v /home/deploy/aipanel/docker/backups:/backup \
-  --entrypoint sh quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z -c \
-  "mc alias set s3 http://minio:9000 '$MINIO_ROOT_USER' '$MINIO_ROOT_PASSWORD' \
-   && mc mirror --overwrite s3/copanel-media /backup/media"
-```
-
-Восстановление из архива: распаковать обратно в `docker/minio` при **остановленном** minio.
+Файл записывается целиком и потом не меняется, так что останавливать бэкенд не нужно.
+Восстановление — распаковать обратно в `docker/` и вернуть владельца:
+`sudo chown -R 1001:1001 docker/uploads`.
 
 ### Продление сертификатов (cron)
 
@@ -389,12 +362,10 @@ Wildcard, если будет выпущен по DNS-01, — вручную р�
 
 - Локально nginx проксирует на `host.docker.internal` (dev-серверы на хосте), в проде —
   на контейнеры `frontend`/`backend` по имени сервиса.
-- Локально стек висит на портах `340x` (nginx :3400, Next :3401, Nest :3402, Postgres :3403,
-  MinIO :3404 и консоль :3405), в проде — стандартные 80/443 снаружи и 3000/3010/5432/9000
-  внутри сети контейнеров.
-- Локально S3 API у minio опубликован на хост (`S3_ENDPOINT=http://localhost:3404`), потому что
-  бэкенд крутится на хосте. В проде бэкенд — контейнер, и endpoint внутренний:
-  `http://minio:9000`; наружу S3 API не выходит вообще.
+- Локально стек висит на портах `340x` (nginx :3400, Next :3401, Nest :3402, Postgres :3403),
+  в проде — стандартные 80/443 снаружи и 3000/3010/5432 внутри сети контейнеров.
+- Файлы медиатеки локально — папка `backend/uploads` (бэкенд на хосте), в проде —
+  `docker/uploads`, примонтированная в контейнер бэкенда как `/data/uploads`.
 - Локально всё по `http://localhost:3400`, в проде — HTTPS с HSTS.
 - Схема БД мигрируется самим NestJS (`sequelize sync: { alter: true }`) — отдельного шага
   миграций в деплое нет.
@@ -406,8 +377,5 @@ Wildcard, если будет выпущен по DNS-01, — вручную р�
 - **Google OAuth возвращает `redirect_uri_mismatch`** — URI в Google Console не совпадает
   с `GOOGLE_CALL_BACK` посимвольно (протокол, `www`, слеш на конце).
 - **CI падает на `docker login`** — истёк `GHCR_PAT` или у него нет `write:packages`.
-- **`nginx: host not found in upstream "minio"`** — nginx резолвит имя при старте, а контейнера
-  minio нет. Поднять его (`docker compose up -d minio`), затем nginx.
-- **`/uploads/...` отдаёт 403, хотя файл загрузился** — бэкенд не выставил политику анонимного
-  чтения на бакет. Смотреть `docker compose logs backend` при старте.
-- **minio не стартует, в логах про пароль** — `MINIO_ROOT_PASSWORD` короче 8 символов или пуст.
+- **Загрузка файла падает с `EACCES`** — папка `docker/uploads` на сервере не принадлежит
+  uid 1001: `sudo chown -R 1001:1001 docker/uploads`.

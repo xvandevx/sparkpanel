@@ -34,7 +34,7 @@ export function useStorageOptions() {
 export const storageOptions = (
   storages: StorageDto[],
 ): { value: string; label: string; disabled?: boolean }[] => [
-  { value: BUILTIN_STORAGE, label: 'Встроенное (MinIO панели)' },
+  { value: BUILTIN_STORAGE, label: 'Встроенное (папка панели)' },
   ...storages.map((storage) => ({
     value: String(storage.id),
     label: storage.isActive ? storage.name : `${storage.name} (выключено)`,

@@ -25,11 +25,16 @@ FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production \
     PORT=3000 \
-    FRONTEND_DIR=/app/frontend
+    FRONTEND_DIR=/app/frontend \
+    UPLOADS_DIR=/data/uploads
 COPY --from=backend --chown=node:node /backend/package.json ./
 COPY --from=backend --chown=node:node /backend/node_modules ./node_modules
 COPY --from=backend --chown=node:node /backend/dist ./dist
 COPY --from=frontend --chown=node:node /frontend/out ./frontend
+# Встроенное хранилище файлов — том /data/uploads. Папка заведена в образе
+# с владельцем node: новый том Docker создаёт с её правами, и сервер может писать
+RUN mkdir -p /data/uploads && chown node:node /data/uploads
+VOLUME /data/uploads
 USER node
 EXPOSE 3000
 CMD ["node", "dist/main"]

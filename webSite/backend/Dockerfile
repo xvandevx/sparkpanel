@@ -24,6 +24,11 @@ COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 
+# Встроенное хранилище файлов — папка, на проде в неё монтируется том.
+# Владелец — nestjs: сервер пишет туда загруженные файлы
+RUN mkdir -p /data/uploads && chown nestjs:nodejs /data/uploads
+ENV UPLOADS_DIR /data/uploads
+
 USER nestjs
 
 # Внутри контейнера — 3010 (как и в prod/docker-compose.yml).

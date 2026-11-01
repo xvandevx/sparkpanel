@@ -8,7 +8,7 @@
 ## Запуск
 
 ```bash
-./scripts/dev.sh      # docker (nginx :3400 + postgres :3403 + minio :3404) + backend :3402 + frontend :3401
+./scripts/dev.sh      # docker (nginx :3400 + postgres :3403) + backend :3402 + frontend :3401
 ./scripts/stop.sh     # погасить всё
 ```
 
@@ -20,9 +20,8 @@
 | Панель | http://localhost:3400/admin |
 | API | http://localhost:3400/api |
 | Swagger | http://localhost:3400/api/docs |
-| Файлы медиатеки | http://localhost:3400/uploads/&lt;ключ&gt; (бакет `copanel-media` в MinIO) |
+| Файлы медиатеки | http://localhost:3400/uploads/&lt;ключ&gt; (папка `backend/uploads`) |
 | Postgres | localhost:3403 |
-| MinIO | S3 API localhost:3404, консоль http://localhost:3405 (minioadmin / minioadmin) |
 
 Первый запуск: `cp backend/.env.example backend/.env`, затем `npm install` в `backend/` и `frontend/`.
 

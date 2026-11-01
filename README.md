@@ -49,14 +49,14 @@ Update: `docker compose pull && docker compose up -d`. The image is
 `ghcr.io/xvandevx/sparkpanel` (`:latest`, `:1`, `:1.4.0`); pin a version with
 `SPARKPANEL_VERSION` in `.env`.
 
-One image runs the panel and the API on a single port; Postgres and MinIO run next to
-it. Put any reverse proxy (Caddy, Traefik, nginx) in front for HTTPS.
+One image runs the panel and the API on a single port, with Postgres next to it.
+Uploaded files live in a folder on a volume and are served by the panel itself; add an
+S3 storage in the settings if you prefer. Put any reverse proxy (Caddy, Traefik, nginx) in front for HTTPS.
 Details: [webSite/headless/README.md](webSite/headless/README.md).
 
 ## Roadmap
 
 - Permissions by role
-- Serving built-in storage files from the standalone image
 - Webhooks on publish
 - English UI
 
