@@ -1,0 +1,251 @@
+/* Раскладка формы, описанной данными: одинакова и в шторке редактора, и на
+   отдельных экранах вроде «Настроек» — поле всегда выглядит одним и тем же. */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Заголовок группы: без линии-разделителя, отступы держит gap группы */
+.groupTitle {
+  margin: 4px 0 0;
+}
+
+.field {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  padding: 8px 0;
+
+  > label {
+    width: 200px;
+    flex-shrink: 0;
+    padding-top: 6px;
+    text-align: right;
+  }
+
+  > div {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.required::after {
+  content: ' *';
+  color: #ff4d4f;
+}
+
+.variables {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.preview {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px dashed rgba(5, 5, 5, 0.15);
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 0 0;
+  list-style: none;
+
+  > li {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+}
+
+/* Поле «файл медиатеки»: выбранные файлы карточками в столбик, кнопка выбора под ними */
+.media {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.mediaItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 560px;
+  padding: 6px 8px;
+  border: 1px solid rgba(5, 5, 5, 0.06);
+  border-radius: 8px;
+}
+
+.mediaInfo {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+/* Превью одной рамки при любой пропорции картинки */
+.mediaThumb {
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.mediaThumbRoot {
+  display: block;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.mediaThumbEmpty {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.04);
+  color: rgba(0, 0, 0, 0.35);
+  font-size: 20px;
+}
+
+/* Окно выбора файла */
+.mediaPicker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mediaFilters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  > :first-child {
+    flex: 1;
+    min-width: 200px;
+  }
+}
+
+.mediaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.mediaOption {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid rgba(5, 5, 5, 0.06);
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    border-color: rgba(22, 119, 255, 0.5);
+  }
+}
+
+/* Файл, который не подходит под ограничения поля: виден, но не выбирается.
+   Ставится вместе с .mediaOption */
+.mediaOptionBlocked {
+  cursor: not-allowed;
+  opacity: 0.6;
+
+  &:hover {
+    border-color: rgba(5, 5, 5, 0.06);
+  }
+}
+
+/* Визуальный редактор: панель и поле Quill в рамке antd */
+.richText {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  :global {
+    .ql-toolbar.ql-snow,
+    .ql-container.ql-snow {
+      border-color: #d9d9d9;
+    }
+
+    .ql-toolbar.ql-snow {
+      border-radius: 6px 6px 0 0;
+    }
+
+    .ql-container.ql-snow {
+      border-radius: 0 0 6px 6px;
+      font: inherit;
+    }
+
+    .ql-editor {
+      min-height: 160px;
+    }
+  }
+}
+
+.richTextDisabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Таблица-значение: сетка ячеек в рамке, прокрутка вбок у широких */
+.tableField {
+  overflow-x: auto;
+
+  table {
+    border-collapse: collapse;
+  }
+
+  td {
+    min-width: 120px;
+    padding: 0;
+    border: 1px solid #d9d9d9;
+  }
+}
+
+/* Строка множественного поля: само поле и кнопка «убрать» рядом */
+.multiValueRow {
+  display: flex;
+  gap: 4px;
+  align-items: flex-start;
+
+  > div {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* Столбец с кнопкой «убрать строку» в таблице — по ширине кнопки */
+.tableRowAction {
+  width: 32px;
+  text-align: center;
+}

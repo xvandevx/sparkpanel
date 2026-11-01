@@ -1,0 +1,118 @@
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Длинные значения переносятся, таблица не растягивает страницу */
+.table {
+  :global {
+    .ant-table-cell {
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+  }
+}
+
+.selectedRow {
+  :global {
+    td {
+      background: rgba(22, 119, 255, 0.08) !important;
+    }
+  }
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
+.drawerHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* Содержимое шторки: предупреждения и вкладки в столбик.
+   Сами поля рисует components/editorForm — их раскладка общая. */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Окно настроек списка: имя и код, ниже таблица свойств и кнопка добавления */
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Заголовок блока внутри окна: без линии-разделителя */
+.sectionTitle {
+  margin: 4px 0 0;
+}
+
+.historyValue {
+  margin: 0;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  line-height: 1.45;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.historyDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+
+  summary {
+    cursor: pointer;
+    user-select: none;
+    font-size: 13px;
+  }
+}
+
+/* Превью картинки в таблице: одинаковая рамка у любой пропорции */
+.preview {
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.previewRoot {
+  display: block;
+  line-height: 0;
+}
+
+.previewEmpty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 48px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.04);
+  color: rgba(0, 0, 0, 0.35);
+}
+
+/* Настройки свойства в строке таблицы: форматы сверху, вес и разрешение под ними */
+.propertyConfig {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

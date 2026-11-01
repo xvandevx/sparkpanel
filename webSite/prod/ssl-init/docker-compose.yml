@@ -1,0 +1,26 @@
+# Первый выпуск / продление SSL: временный nginx :80 + certbot -> ../docker/nginx/certs
+# Прод-nginx на порту 80 делает 301-редирект, поэтому выпуск идёт через ЭТОТ
+# временный nginx (прод-nginx на время выпуска останавливается).
+#
+#   cd prod/ssl-init
+#   ./issue-cert.sh ai-panel.app            # HTTP-01, обычный домен + www
+#   ./issue-wildcard.sh ai-panel.app        # DNS-01, wildcard *.ai-panel.app
+
+name: aipanel-ssl-init
+
+services:
+    nginx:
+        image: nginx:1.27-alpine
+        restart: unless-stopped
+        ports:
+            - "${HTTP_PORT:-80}:80"
+        volumes:
+            - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+            - ../docker/nginx/certbot:/var/www/certbot
+
+    certbot:
+        profiles: ["certbot"]
+        image: certbot/certbot:latest
+        volumes:
+            - ../docker/nginx/certs:/etc/letsencrypt
+            - ../docker/nginx/certbot:/var/www/certbot

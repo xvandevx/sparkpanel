@@ -1,0 +1,46 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "stack",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["/Users/ivanaleks/MyProjects/aiAdmin/webSite/scripts/dev.sh"],
+      "port": 3402
+    },
+    {
+      "name": "docker",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": [
+        "compose",
+        "-f",
+        "/Users/ivanaleks/MyProjects/aiAdmin/webSite/docker-compose.yml",
+        "up",
+        "nginx",
+        "postgres"
+      ],
+      "port": 3400
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "/Users/ivanaleks/MyProjects/aiAdmin/webSite/backend",
+        "run",
+        "start:dev"
+      ],
+      "port": 3402
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "/Users/ivanaleks/MyProjects/aiAdmin/webSite/frontend",
+        "run",
+        "dev"
+      ],
+      "port": 3401
+    }
+  ]
+}

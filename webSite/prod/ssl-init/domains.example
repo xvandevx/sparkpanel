@@ -1,0 +1,3 @@
+# Обычные домены (HTTP-01). Каждый выпускается вместе с www.<домен>.
+# Wildcard *.ai-panel.app здесь НЕ указывать — он идёт через ./issue-wildcard.sh ai-panel.app
+ai-panel.app

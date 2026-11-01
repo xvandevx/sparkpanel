@@ -1,0 +1,173 @@
+# Прод aiAdmin: nginx (80/443) -> frontend (Next :3000) / backend (NestJS :3010) -> postgres,
+# плюс minio (S3-хранилище медиатеки, :9000 внутри сети) — nginx отдаёт из него /uploads/.
+# На сервер копируется ТОЛЬКО папка prod/. Образы приезжают из GHCR (пушит CI).
+#
+#   docker compose pull && docker compose up -d
+#
+# Секреты — в .env рядом (см. .env.example), в git не коммитятся.
+#
+# ВНУТРЕННИЕ порты контейнеров (3000/3010) с локальными 340x не конфликтуют:
+# наружу здесь публикуются только 80/443 (и 9000 для Dozzle).
+# Порт 9000 у minio — ВНУТРИ его контейнера, на хост он не выходит, так что с Dozzle
+# они не спорят. На хосте у minio только консоль: 127.0.0.1:9001.
+
+name: aipanel
+
+services:
+    nginx:
+        image: nginx:1.27-alpine
+        container_name: aipanel-nginx
+        ports:
+            - "80:80"
+            - "443:443"
+        volumes:
+            - "./docker/nginx/conf.d:/etc/nginx/conf.d:ro"
+            - "./docker/nginx/certs:/etc/nginx/certs"
+            - "./docker/nginx/log:/var/log/nginx"
+            - "./docker/nginx/auth:/etc/nginx/auth"
+        depends_on:
+            - frontend
+            - backend
+            # nginx резолвит имя minio при старте (location /uploads/) — контейнер
+            # должен существовать, иначе "host not found in upstream" и nginx не поднимется.
+            - minio
+        networks:
+            - internal-network
+            - external-network
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "5"
+        restart: always
+
+    frontend:
+        image: ghcr.io/ai-panel/frontend:main
+        container_name: aipanel-frontend
+        environment:
+            NODE_ENV: production
+            # БРАУЗЕР: пусто = относительные /api-пути, тот же origin через nginx (без CORS).
+            NEXT_PUBLIC_API_HOST: ""
+            # SSR: getServerSideProps выполняется ВНУТРИ контейнера, где относительный
+            # путь "/api/..." резолвить не от чего — fetch требует абсолютный URL.
+            # Ходим к бэкенду напрямую по внутренней сети, минуя nginx и TLS.
+            API_HOST: http://backend:3010
+        networks:
+            - internal-network
+        volumes:
+            - /etc/localtime:/etc/localtime:ro
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "5"
+        restart: always
+
+    backend:
+        image: ghcr.io/ai-panel/backend:main
+        container_name: aipanel-backend
+        env_file: .env
+        environment:
+            NODE_ENV: production
+            POSTGRES_HOST: postgres
+            POSTGRES_PORT: 5432
+            # S3-хранилище медиатеки. Хосты/имена — здесь, секреты — в .env.
+            # Бэкенд ходит в minio ПО ВНУТРЕННЕЙ СЕТИ (наружу S3 API не опубликован),
+            # а фронту отдаёт относительные ссылки S3_PUBLIC_PREFIX/<objectKey>,
+            # которые разворачивает nginx (location /uploads/).
+            S3_ENDPOINT: http://minio:9000
+            S3_REGION: us-east-1
+            S3_BUCKET: copanel-media
+            S3_PUBLIC_PREFIX: /uploads
+            # Те же креды, что у самого minio — берутся из .env, чтобы не дублировать
+            # значение в двух местах (compose подставляет их из prod/.env).
+            S3_ACCESS_KEY: ${MINIO_ROOT_USER}
+            S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+        depends_on:
+            - postgres
+            - minio
+        networks:
+            - internal-network
+        volumes:
+            - /etc/localtime:/etc/localtime:ro
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "5"
+        restart: always
+
+    postgres:
+        image: postgres:16-alpine
+        container_name: aipanel-postgres
+        env_file: .env
+        ports:
+            # Только петлевой интерфейс сервера: снаружи порт закрыт, доступ к базе
+            # с рабочей машины — через SSH-туннель (см. prod/README.md).
+            - "127.0.0.1:5432:5432"
+        volumes:
+            - "./docker/postgres:/var/lib/postgresql/data"
+        networks:
+            - internal-network
+        logging:
+            driver: json-file
+            options:
+                max-size: "1m"
+                max-file: "3"
+        restart: always
+
+    # S3-хранилище медиатеки (раздел «Файлы»). Бакет copanel-media и анонимное чтение
+    # объектов настраивает сам бэкенд при старте. Файлы лежат в ./docker/minio —
+    # это ВТОРОЙ том с данными помимо postgres, его тоже надо бэкапить (см. README).
+    minio:
+        # Реестр minio, а не docker hub: minio/minio на hub отдаёт "pull access denied"
+        # анонимным клиентам. Версия зафиксирована — поднимать осознанно (список релизов:
+        # https://quay.io/repository/minio/minio?tab=tags).
+        image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+        container_name: aipanel-minio
+        command: server /data --console-address ":9001"
+        # MINIO_ROOT_USER / MINIO_ROOT_PASSWORD
+        env_file: .env
+        ports:
+            # S3 API (9000) наружу НЕ публикуем вообще: к нему ходят только backend
+            # и nginx по внутренней сети. Консоль — как postgres, только петлевой
+            # интерфейс сервера; с рабочей машины через SSH-туннель (см. README).
+            - "127.0.0.1:9001:9001"
+        volumes:
+            - "./docker/minio:/data"
+            - /etc/localtime:/etc/localtime:ro
+        networks:
+            - internal-network
+        healthcheck:
+            test: ["CMD", "mc", "ready", "local"]
+            interval: 30s
+            timeout: 5s
+            retries: 5
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "5"
+        restart: always
+
+    # UI для логов всех контейнеров: http://<SERVER_IP>:9000
+    dozzle:
+        image: amir20/dozzle:latest
+        container_name: aipanel-logs
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+        environment:
+            - DOZZLE_LEVEL=info
+        ports:
+            - "9000:8080"
+        networks:
+            - internal-network
+            - external-network
+        restart: unless-stopped
+
+networks:
+    internal-network:
+        driver: bridge
+
+    external-network:
+        driver: bridge

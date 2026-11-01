@@ -1,0 +1,1 @@
+export { usePagesNewController } from './usePagesNewController';

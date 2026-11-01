@@ -1,0 +1,76 @@
+/*
+ * Рамка визуального редактора — как у поля antd: цвета и скругление берутся
+ * из токенов темы через переменные (их ставит компонент), своих цветов нет.
+ */
+.frame {
+  border: 1px solid var(--html-border);
+  border-radius: var(--html-radius);
+  overflow: hidden;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--html-border);
+  background: var(--html-muted);
+}
+
+.divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--html-border);
+}
+
+/* Текст внутри — как его покажет сайт: отступы абзацев, таблицы с рамками */
+.content :global(.ProseMirror) {
+  min-height: 220px;
+  max-height: 560px;
+  overflow-y: auto;
+  padding: 8px 12px;
+  outline: none;
+}
+
+.content :global(.ProseMirror) > * + * {
+  margin-top: 0.6em;
+}
+
+.content :global(.ProseMirror) img {
+  max-width: 100%;
+  height: auto;
+}
+
+.content :global(.ProseMirror) img:global(.ProseMirror-selectednode) {
+  outline: 2px solid var(--html-active);
+}
+
+.content :global(.ProseMirror) table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.content :global(.ProseMirror) th,
+.content :global(.ProseMirror) td {
+  border: 1px solid var(--html-border);
+  padding: 4px 8px;
+  vertical-align: top;
+}
+
+.content :global(.ProseMirror) th {
+  background: var(--html-muted);
+  text-align: left;
+}
+
+.content :global(.ProseMirror) blockquote {
+  margin-left: 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--html-border);
+}
+
+.content :global(.ProseMirror) ul,
+.content :global(.ProseMirror) ol {
+  padding-left: 24px;
+}

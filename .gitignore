@@ -1,0 +1,11 @@
+.DS_Store
+.idea/
+
+# локальные данные postgres
+/webSite/docker/postgres
+
+# локальные данные minio (загруженные файлы медиатеки)
+/webSite/docker/minio
+
+# секреты образа headless (шаблон — .env.example рядом)
+/webSite/headless/.env

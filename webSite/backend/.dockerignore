@@ -1,0 +1,10 @@
+# Контекст сборки образа: локальные node_modules/dist в образ не нужны — их собирает CI.
+node_modules
+dist
+coverage
+.git
+.github
+.env
+.local.env
+.DS_Store
+*.log

@@ -1,0 +1,14 @@
+.env
+docker/postgres/
+docker/minio/
+docker/backups/
+docker/nginx/log/*
+!docker/nginx/log/.gitkeep
+docker/nginx/certbot/
+docker/nginx/certs/*
+!docker/nginx/certs/.gitkeep
+!docker/nginx/certs/dhparam.pem
+docker/nginx/auth/*
+!docker/nginx/auth/.gitkeep
+ssl-init/nginx.conf
+ssl-init/domains.txt

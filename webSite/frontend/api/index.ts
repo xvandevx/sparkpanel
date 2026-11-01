@@ -1,0 +1,15 @@
+export * as authApi from './auth';
+export * as contentItemsApi from './contentItems';
+export * as contentsApi from './contents';
+export * as fileSectionsApi from './fileSections';
+export * as filesApi from './files';
+export * as historyApi from './history';
+export * as infoblockSettingsApi from './infoblockSettings';
+export * as pagesApi from './pages';
+export * as productCategoriesApi from './productCategories';
+export * as productsApi from './products';
+export * as recordsApi from './records';
+export * as rolesApi from './roles';
+export * as settingsApi from './settings';
+export * as storagesApi from './storages';
+export * as usersApi from './users';

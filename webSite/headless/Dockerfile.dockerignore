@@ -1,0 +1,17 @@
+# Что не уходит в сборку образа. Лежит рядом с Dockerfile, а не в корне webSite/:
+# BuildKit берёт `<Dockerfile>.dockerignore` и не путает его с файлами наших
+# docker/ и prod/.
+**/node_modules
+**/.next
+**/out
+**/dist
+**/.env
+**/.env.*
+!**/.env.example
+**/to_delete
+**/coverage
+**/.DS_Store
+docker
+prod
+headless
+scripts

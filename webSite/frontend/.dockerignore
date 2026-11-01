@@ -1,0 +1,13 @@
+# Контекст сборки образа. Без этого файла в builder уезжают локальные node_modules/.next
+# и затирают то, что поставил слой deps, — сборка либо тормозит, либо ловит чужую платформу.
+node_modules
+.next
+out
+build
+coverage
+.git
+.github
+.env*.local
+.DS_Store
+*.log
+*.tsbuildinfo

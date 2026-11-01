@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 184 44" width="184" height="44" role="img" aria-label="SparkPanel">
+  <defs>
+    <linearGradient id="sp-spark" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FBA24B"/>
+      <stop offset="0.55" stop-color="#F67841"/>
+      <stop offset="1" stop-color="#F24357"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(0 0.5) scale(0.4)">
+    <path fill="url(#sp-spark)" d="M48.5 2L49 27C49 36 38 44 27 49C18 53 12 64 12 70C6 66 2 58 2 51C2 36 27 18 48.5 2Z"/>
+    <path fill="url(#sp-spark)" d="M49.5 40.5C55 45 62 52 62 61C62 75 28 98 16 105L16 90C16 78 30 66 38 61C44 57.5 49 53 49 46Z"/>
+  </g>
+  <text x="34" y="31" font-family="Onest, Inter, 'Helvetica Neue', Arial, sans-serif" font-size="26" letter-spacing="-0.3"><tspan font-weight="700" fill="#11131F">Spark</tspan><tspan font-weight="400" fill="#4F5363">Panel</tspan></text>
+</svg>
