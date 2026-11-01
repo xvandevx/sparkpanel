@@ -1,4 +1,5 @@
 # SparkPanel целиком: панель (один образ) + Postgres + MinIO для файлов.
+# Файлы MinIO (/uploads/…) отдаёт сама панель — наружу MinIO не публикуется.
 # Пример для того, кто ставит панель себе. Рядом — .env (шаблон .env.example).
 #
 #   docker compose up -d        → http://localhost:3000

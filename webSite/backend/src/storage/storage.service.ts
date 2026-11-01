@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import {
   CreateBucketCommand,
   DeleteObjectCommand,
+  GetObjectCommand,
+  GetObjectCommandOutput,
   HeadBucketCommand,
   PutBucketPolicyCommand,
   PutObjectCommand,
@@ -31,14 +33,22 @@ export type StorageTarget =
   | { kind: StorageKind.Builtin }
   | { kind: StorageKind.External; config: S3Config };
 
+/** Условия чтения объекта — заголовки запроса браузера, как пришли. */
+export interface ReadConditions {
+  range?: string;
+  ifNoneMatch?: string;
+  ifModifiedSince?: string;
+}
+
 /**
  * Файловое хранилище панели — S3. Встроенное — MinIO из docker-compose: его
- * адрес и ключи в env, бакет бэкенд заводит сам, а отдаёт файлы nginx по
- * `/uploads/<ключ>` с того же origin. Внешнее задают в настройках сайта:
- * бакет там чужой, его не создаём и прав на нём не меняем — только кладём
- * и убираем объекты.
+ * адрес и ключи в env, бакет бэкенд заводит сам, а файлы видны по
+ * `/uploads/<ключ>` с того же origin: локально и на нашем проде их отдаёт
+ * nginx, в образе headless — сама панель (`serve-uploads.ts`). Внешнее
+ * задают в настройках сайта: бакет там чужой, его не создаём и прав на нём
+ * не меняем — только кладём и убираем объекты.
  *
- * Сервис знает только про объекты: положить, удалить, сказать адрес.
+ * Сервис знает только про объекты: положить, прочитать, удалить, сказать адрес.
  * Что за файл лежит по ключу — забота модуля `files/`.
  */
 @Injectable()
@@ -111,12 +121,39 @@ export class StorageService implements OnModuleInit {
   /**
    * Адрес объекта для браузера. Не хранится, а собирается: сменили публичный
    * адрес хранилища (подключили CDN) — сменились и адреса всех его файлов.
-   * Встроенное хранилище отдаёт nginx с того же origin — адрес относительный.
+   * Встроенное хранилище отдаётся с того же origin — адрес относительный.
    */
   url(target: StorageTarget, key: string): string {
     return target.kind === StorageKind.Builtin
       ? `${this.publicPrefix}/${key}`
       : externalUrl(target.config, key);
+  }
+
+  /**
+   * Путь, по которому панель отдаёт встроенное хранилище сама (`/uploads`).
+   * `S3_PUBLIC_PREFIX` задан полным адресом (CDN перед бакетом) — null:
+   * браузер ходит туда, панели раздавать нечего.
+   */
+  get servedPath(): string | null {
+    return this.publicPrefix.startsWith('/') ? this.publicPrefix : null;
+  }
+
+  /**
+   * Объект встроенного хранилища — для раздачи по `servedPath`. Range
+   * и условные заголовки уходят в хранилище как есть: часть файла (206)
+   * и «не изменился» (304) решает оно, 304 приходит ошибкой SDK.
+   */
+  read(key: string, conditions: ReadConditions): Promise<GetObjectCommandOutput> {
+    const since = conditions.ifModifiedSince ? new Date(conditions.ifModifiedSince) : null;
+    return this.builtin.send(
+      new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Range: conditions.range,
+        IfNoneMatch: conditions.ifNoneMatch,
+        IfModifiedSince: since && !isNaN(since.getTime()) ? since : undefined,
+      }),
+    );
   }
 
   async remove(target: StorageTarget, key: string): Promise<void> {
@@ -139,7 +176,8 @@ export class StorageService implements OnModuleInit {
 
   /**
    * Встроенный бакет заводится сам при первом обращении и открывается на
-   * анонимное чтение: картинки с сайта смотрят без токена. Открывается ровно
+   * анонимное чтение: nginx отдаёт из него картинки сайту без токена (панель
+   * в образе headless читает своими ключами). Открывается ровно
    * `s3:GetObject` — права на список объектов не выдаются, перебрать содержимое
    * бакета нельзя.
    */

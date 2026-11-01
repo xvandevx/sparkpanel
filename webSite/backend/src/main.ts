@@ -4,6 +4,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { json } from 'express';
 import { AppModule } from './app.module';
 import { serveFrontend } from './frontend/serve-frontend';
+import { serveUploads } from './storage/serve-uploads';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -35,6 +36,10 @@ async function bootstrap() {
     )
     .build();
   SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swaggerConfig));
+
+  // Файлы встроенного хранилища (/uploads/…) — из MinIO через панель.
+  // Локально и на проде их раньше перехватывает nginx
+  serveUploads(app);
 
   // Образ headless: панель статикой с того же порта (webSite/headless/).
   // Локально переменной нет — фронтенд отдаёт `next dev` через nginx
