@@ -53,7 +53,6 @@ Details: [webSite/headless/README.md](webSite/headless/README.md).
 
 - Permissions by role
 - Serving built-in storage files from the standalone image
-- Protected first-run setup
 - Webhooks on publish
 - English UI
 
