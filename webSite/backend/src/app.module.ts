@@ -60,6 +60,22 @@ import { StorageModule } from './storage/storage.module';
 import { Users } from './users/users.model';
 import { UsersModule } from './users/users.module';
 
+/**
+ * Подключение к базе: `DATABASE_URL` одной строкой (`postgres://user:pass@host:5432/db`,
+ * `?sslmode=…` разбирает сам Sequelize) или, если её нет, пять `POSTGRES_*`, как раньше.
+ * Строка сильнее: при ней `POSTGRES_*` не читаются вовсе.
+ */
+const databaseConnection = () =>
+  process.env.DATABASE_URL
+    ? { uri: process.env.DATABASE_URL }
+    : {
+        host: process.env.POSTGRES_HOST,
+        port: Number(process.env.POSTGRES_PORT),
+        username: process.env.POSTGRES_USER,
+        password: process.env.POSTGRES_PASSWORD,
+        database: process.env.POSTGRES_DB,
+      };
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -68,11 +84,7 @@ import { UsersModule } from './users/users.module';
     }),
     SequelizeModule.forRoot({
       dialect: 'postgres',
-      host: process.env.POSTGRES_HOST,
-      port: Number(process.env.POSTGRES_PORT),
-      username: process.env.POSTGRES_USER,
-      password: process.env.POSTGRES_PASSWORD,
-      database: process.env.POSTGRES_DB,
+      ...databaseConnection(),
       // Новую сущность добавлять сюда же. `sync` заводит только новые таблицы
       // (`alter: false`): правку существующей — колонку, индекс, перенос
       // данных — пишут миграцией в `src/migrations/`. `alter: true` молча

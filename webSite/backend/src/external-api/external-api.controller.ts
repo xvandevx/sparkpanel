@@ -12,8 +12,13 @@ import {
 import { ExternalApiService } from './external-api.service';
 import { ApiKeyGuard } from './keys/api-key.guard';
 
-/** Адрес сайта, с которого пришёл запрос: из него — полные адреса файлов и `servers` спецификации. */
+/**
+ * Внешний адрес панели: из него — полные адреса файлов и `servers` спецификации.
+ * Задан `PUBLIC_URL` — он; иначе адрес, с которого пришёл запрос (прокси перед
+ * панелью должен передать `Host` и `X-Forwarded-Proto`).
+ */
 export const originOf = (req: Request): string => {
+  if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/+$/, '');
   const proto = (req.header('x-forwarded-proto') ?? req.protocol).split(',')[0].trim();
   return `${proto}://${req.get('host')}`;
 };

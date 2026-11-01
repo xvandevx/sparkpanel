@@ -18,11 +18,12 @@ services:
     ports:
       - "${PORT:-3000}:3000"
     environment:
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_USER: sparkpanel
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?задайте DB_PASSWORD в .env}
-      POSTGRES_DB: sparkpanel
+      # База — одной строкой. Своя (managed) база: подставьте её адрес, сервис
+      # postgres ниже тогда не нужен; TLS — `?sslmode=require` в конце строки
+      DATABASE_URL: postgres://sparkpanel:${DB_PASSWORD:?задайте DB_PASSWORD в .env}@postgres:5432/sparkpanel
+      # Внешний адрес панели (https://cms.example.com): из него — полные адреса файлов
+      # во внешнем API и `servers` его спецификации. Пусто — берётся из запроса
+      PUBLIC_URL: ${PUBLIC_URL:-}
       PRIVATE_KEY: ${PRIVATE_KEY:?задайте PRIVATE_KEY в .env}
       S3_ENDPOINT: http://minio:9000
       S3_BUCKET: sparkpanel-media

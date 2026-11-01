@@ -53,6 +53,21 @@ docker compose up -d --build
 
 Панель — `http://localhost:3000`. Первым входом заводится главный администратор.
 
+## Переменные
+
+Все — в `environment:` у `sparkpanel` в `docker-compose.yml`, секреты — из `.env`.
+
+| Переменная | Назначение |
+|------------|-----------|
+| `DATABASE_URL` | база одной строкой: `postgres://user:pass@host:5432/db`, TLS — `?sslmode=require` (сертификат проверяется; самоподписанный — `?sslmode=no-verify`). Спецсимволы в пароле — URL-кодом (`@` → `%40`). Без неё читаются пять `POSTGRES_*` (`HOST`, `PORT`, `USER`, `PASSWORD`, `DB`), как в нашей разработке |
+| `PUBLIC_URL` | внешний адрес панели (`https://cms.example.com`): из него полные адреса файлов во внешнем API и `servers` спецификации. Не задан — адрес из запроса (`Host` + `X-Forwarded-Proto` от прокси) |
+| `PRIVATE_KEY` | подпись входа в панель (JWT) |
+| `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | встроенное хранилище файлов (MinIO из того же compose) |
+| `FRONTEND_DIR` | папка статики панели; в образе уже задана (`/app/frontend`) |
+
+Своя база вместо сервиса `postgres` — заменить `DATABASE_URL` на её адрес и убрать
+`postgres` из compose (вместе с `depends_on`).
+
 Только образ, без запуска: `cd webSite && docker build -f headless/Dockerfile -t sparkpanel:dev .`
 
 **Статику не собирать в рабочей папке `frontend/`.** Промежуточная сборка Next пишет
@@ -68,6 +83,8 @@ docker compose up -d --build
 - [x] Схема БД — миграциями (`backend/src/migrations/`), `sync: { alter: false }`
 - [x] Фронтенд статикой из NestJS, один образ (эта папка)
 - [x] Раскрытие связей во внешнем API (`?expand=`, `docs/external-api.md`)
+- [x] База одной строкой `DATABASE_URL` (вместо пяти `POSTGRES_*`) и внешний адрес
+  панели `PUBLIC_URL` — переменные ниже
 
 Не готово — образ собирается, но отдавать его людям рано:
 
@@ -76,7 +93,6 @@ docker compose up -d --build
   хранилища (ниже).
 - [ ] **`PRIVATE_KEY` обязателен** — сервер без него не стартует. Нужно: не задан —
   сгенерировать при первом старте и сохранить в томе.
-- [ ] Переменные окружения проще: `DATABASE_URL` вместо пяти `POSTGRES_*`, `PUBLIC_URL`.
 - [ ] `/api/health` и `HEALTHCHECK` в образе.
 - [ ] Сборка образа в CI с версиями (`:1.4.0`, `:1`, `:latest`), Docker Hub + GHCR,
   образы для amd64 и arm64.

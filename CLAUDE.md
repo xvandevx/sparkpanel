@@ -289,7 +289,9 @@ Swagger на `/api/docs`.
   отвечает 409. Второго root не появится даже при гонке — на `users` висит частичный уникальный
   индекс `users_single_root` (`UNIQUE ("isRoot") WHERE "isRoot" = true`), проверки в сервисе для этого
   недостаточно.
-  Конфиг БД и секреты — из env (`POSTGRES_*`, `PRIVATE_KEY`), шаблон — `backend/.env.example`.
+  Конфиг БД и секреты — из env (`DATABASE_URL` одной строкой или пять `POSTGRES_*`;
+  строка сильнее, `PRIVATE_KEY`), шаблон — `backend/.env.example`. Внешний адрес панели —
+  `PUBLIC_URL` (не задан — из запроса, `external-api.controller.ts` → `originOf`).
   Google OAuth пока не подключён — задел под него остался в nginx/prod-конфигах.
 - **Страницы сайта:** модуль `infoblocks/pages/` (дерево страниц) плюс `infoblocks/history/`
   (журнал изменений, общий на все разделы: `/api/infoblocks/history/:listKey`, таблица
