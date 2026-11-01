@@ -10,8 +10,7 @@ import {
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
-import { Transaction, UniqueConstraintError } from 'sequelize';
-import { PropertyValue } from '../../values/property-values.model';
+import { QueryTypes, Transaction, UniqueConstraintError } from 'sequelize';
 import { hasProperties, listDefaultName, resolveInfoblock } from '../infoblock-kinds';
 import { InfoblockSettings, SITE_OWNER } from '../settings.model';
 import { OptionSourceDto } from './option-source.dto';
@@ -57,7 +56,6 @@ export class InfoblockPropertiesService implements OnApplicationBootstrap {
     @InjectModel(InfoblockProperty) private readonly propertiesRepo: typeof InfoblockProperty,
     @InjectModel(InfoblockPropertyOption)
     private readonly optionsRepo: typeof InfoblockPropertyOption,
-    @InjectModel(PropertyValue) private readonly valuesRepo: typeof PropertyValue,
     @InjectModel(InfoblockSettings) private readonly settingsRepo: typeof InfoblockSettings,
     @InjectModel(InfoblockTab) private readonly tabsRepo: typeof InfoblockTab,
     @Inject(forwardRef(() => InfoblockSettingsService))
@@ -480,16 +478,20 @@ export class InfoblockPropertiesService implements OnApplicationBootstrap {
     }
   }
 
-  /** Номера свойств, у которых есть значение хотя бы у одной записи. */
+  /**
+   * Номера свойств, у которых есть значение хотя бы у одной записи. Через
+   * `EXISTS` по индексу — по строке на свойство: свойства читает каждое
+   * сохранение значений, и перебор всех значений списка (`GROUP BY`) рос бы
+   * вместе со списком.
+   */
   private async filledOf(propertyIds: number[], transaction?: Transaction): Promise<Set<number>> {
     if (propertyIds.length === 0) return new Set();
-    const rows = await this.valuesRepo.findAll({
-      attributes: ['propertyId'],
-      where: { propertyId: propertyIds },
-      group: ['propertyId'],
-      transaction,
-    });
-    return new Set(rows.map((row) => row.propertyId));
+    const rows = await this.sequelize.query<{ id: number }>(
+      `SELECT p.id FROM unnest(ARRAY[:propertyIds]::int[]) AS p(id)
+       WHERE EXISTS (SELECT 1 FROM infoblock_values v WHERE v."propertyId" = p.id)`,
+      { replacements: { propertyIds }, type: QueryTypes.SELECT, transaction },
+    );
+    return new Set(rows.map((row) => row.id));
   }
 
   /** Варианты «Списка» по номерам свойств: номер свойства → его варианты по порядку. */
