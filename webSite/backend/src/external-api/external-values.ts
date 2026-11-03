@@ -164,6 +164,8 @@ export function parseExpand(raw: string | undefined, properties: ApiPropertyDef[
 export interface ApiFilter {
   propertyId: number;
   filter: RecordFilter;
+  /** У привязки — номера выбранных записей: по ним записи сначала отбирают в базе */
+  linkIds?: string[];
 }
 
 /**
@@ -179,7 +181,10 @@ export function parseApiFilters(raw: unknown, properties: ApiPropertyDef[]): Api
   return Object.entries(raw as Record<string, unknown>).map(([code, value]) => {
     const property = properties.find((item) => item.code === code);
     if (!property) throw new BadRequestException(`Нет свойства «${code}»`);
-    return { propertyId: property.id, filter: filterOf(property, value) };
+    const filter = filterOf(property, value);
+    return isLinkType(property.type)
+      ? { propertyId: property.id, filter, linkIds: listOf(property, value) }
+      : { propertyId: property.id, filter };
   });
 }
 
@@ -267,7 +272,9 @@ export function facetOf(
   values: RecordValues,
   linkNames: Map<string, string | null>,
 ): ApiFacet {
-  const items = rows.flatMap((row) => itemsOf(values.get(String(row.id))?.get(property.id)));
+  // Циклом, а не flatMap: у фасета по всему списку записей тысячи
+  const items: unknown[] = [];
+  for (const row of rows) items.push(...itemsOf(values.get(String(row.id))?.get(property.id)));
 
   if (property.type === PropertyType.Number) {
     const numbers = items.map(Number).filter((number) => Number.isFinite(number));

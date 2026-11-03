@@ -145,6 +145,12 @@ describe('parseApiFilters', () => {
   it('привязка — номера записей в ключи «список/запись»', () =>
     expect(parseApiFilters({ categories: ['3', '4'] }, properties)[0].filter).toMatchObject({ codes: ['product-categories/3', 'product-categories/4'] }));
 
+  it('у привязки — ещё и номера записей для отбора в базе, у остальных их нет', () => {
+    const [categories, brand] = parseApiFilters({ categories: '3, 4', brand: 'bosch' }, properties);
+    expect(categories.linkIds).toEqual(['3', '4']);
+    expect(brand.linkIds).toBeUndefined();
+  });
+
   it('неизвестное свойство и нефильтруемый тип — 400', () => {
     expect(() => parseApiFilters({ nope: '1' }, properties)).toThrow(BadRequestException);
     expect(() => parseApiFilters({ photo: '1' }, properties)).toThrow(BadRequestException);

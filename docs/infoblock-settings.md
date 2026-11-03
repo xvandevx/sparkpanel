@@ -403,7 +403,10 @@
 
 Индексы: `(recordId, propertyId, sort)` — уникальный, плюс `(propertyId, text)`,
 `(propertyId, number)` и `(propertyId, optionId)` под будущие фильтры и сортировку
-по значению свойства, и GIN по `domainIds` — под «значения для домена».
+по значению свойства, GIN по `domainIds` — под «значения для домена» — и
+`infoblock_values_property_link` — `(propertyId, (json->>'recordId'))`: по нему внешнее API
+отбирает записи по привязке (`PropertyValuesService.linkedRecordIds`), не читая значений
+списка (миграция `0003-link-values-index`).
 У мультидоменного свойства `sort` сквозной по всем группам записи: строки одной группы
 идут подряд, порядок групп — по первой строке.
 

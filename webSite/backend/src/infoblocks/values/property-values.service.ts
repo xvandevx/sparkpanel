@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
-import { Op, Transaction } from 'sequelize';
+import { Op, QueryTypes, Transaction } from 'sequelize';
 import { Files } from '../files/files.model';
 import { Domains } from '../domains/domains.model';
 import { HistoryAction } from '../history/history.model';
@@ -158,6 +158,41 @@ export class PropertyValuesService implements OnApplicationBootstrap {
   }
 
   /**
+   * Значения части записей и части свойств — без чтения всего списка:
+   * внешнему API на отбор нужны только свойства фильтра, а на ответ — только
+   * записи страницы. `recordIds` null — все записи списка.
+   */
+  async findSome(listKey: string, recordIds: string[] | null, propertyIds: number[]): Promise<PropertyValuesDto[]> {
+    if (propertyIds.length === 0 || recordIds?.length === 0) return [];
+    return this.read(listKey, recordIds, propertyIds);
+  }
+
+  /**
+   * Записи списка, у которых свойство-привязка указывает на одну из записей
+   * `recordIds` списка `linkList`, — запросом по индексу
+   * `infoblock_values_property_link`, без чтения списка. Домены не
+   * разбираются: подходит значение любого домена, точный отбор
+   * мультидоменного свойства — дальше, по его значениям.
+   */
+  async linkedRecordIds(
+    listKey: string,
+    propertyId: number,
+    linkList: string,
+    recordIds: string[],
+  ): Promise<Set<string>> {
+    const settingsId = await this.settingsService.settingsId(resolveInfoblock(listKey).key);
+    if (settingsId === null || recordIds.length === 0) return new Set();
+    const rows = await this.sequelize.query<{ recordKey: string }>(
+      `SELECT DISTINCT r."recordKey"
+       FROM infoblock_values v JOIN infoblock_records r ON r.id = v."recordId"
+       WHERE r."settingsId" = :settingsId AND v."propertyId" = :propertyId
+         AND v.json->>'recordId' IN (:recordIds) AND v.json->>'listKey' = :linkList`,
+      { replacements: { settingsId, propertyId, recordIds, linkList }, type: QueryTypes.SELECT },
+    );
+    return new Set(rows.map((row) => row.recordKey));
+  }
+
+  /**
    * Когда у записей списка последний раз правили значения свойств (или родителя
    * в дереве настроек): ключ записи → время. Записи без таких правок здесь нет.
    */
@@ -217,14 +252,19 @@ export class PropertyValuesService implements OnApplicationBootstrap {
    */
   async findOne(listKey: string, recordId: string): Promise<RecordValuesDto> {
     assertRecordId(recordId);
-    const [found] = await this.read(listKey, recordId);
+    const [found] = await this.read(listKey, [recordId]);
     return { recordId, values: found?.values ?? [] };
   }
 
-  /** Значения записей списка: всех или одной (`recordId`). */
+  /**
+   * Значения записей списка: всех (`recordIds` null) или перечисленных;
+   * свойств — всех или перечисленных (`propertyIds`). Строки читаются без
+   * моделей (`raw`): у списка в десятки тысяч записей на модели уходили секунды.
+   */
   private async read(
     listKey: string,
-    recordId: string | null,
+    recordIds: string[] | null,
+    propertyIds: number[] | null = null,
   ): Promise<PropertyValuesDto[]> {
     const { key } = resolveInfoblock(listKey);
     const { properties, isTree } = await this.settingsService.settingsOf(key);
@@ -232,17 +272,30 @@ export class PropertyValuesService implements OnApplicationBootstrap {
     if (settingsId === null) return [];
 
     const records = await this.recordsRepo.findAll({
-      where: { settingsId, ...(recordId === null ? {} : { recordKey: recordId }) },
+      attributes: ['id', 'recordKey', 'parentId'],
+      where: { settingsId, ...(recordIds === null ? {} : { recordKey: recordIds }) },
+      raw: true,
     });
     if (records.length === 0) return [];
 
     const rows = await this.valuesRepo.findAll({
-      where: { recordId: records.map((record) => record.id) },
+      attributes: ['recordId', 'propertyId', 'text', 'number', 'json', 'optionId', 'domainIds', 'exceptDomainIds'],
+      where: {
+        // Весь список — подзапросом, а не перечнем в десятки тысяч номеров
+        recordId:
+          recordIds === null
+            ? { [Op.in]: Sequelize.literal(`(SELECT id FROM infoblock_records WHERE "settingsId" = ${Number(settingsId)})`) }
+            : records.map((record) => record.id),
+        ...(propertyIds === null ? {} : { propertyId: propertyIds }),
+      },
       order: [['sort', 'ASC']],
+      raw: true,
     });
     const byRecord = new Map<number, PropertyValue[]>();
     for (const row of rows) {
-      byRecord.set(row.recordId, [...(byRecord.get(row.recordId) ?? []), row]);
+      const own = byRecord.get(row.recordId);
+      if (own) own.push(row);
+      else byRecord.set(row.recordId, [row]);
     }
 
     return records
@@ -646,7 +699,7 @@ export function valuesMap(
         ...(row.domainIds ? {} : { exceptDomainIds: row.exceptDomainIds ?? [] }),
       };
       groups.set(key, group);
-      group.value = [...(group.value as unknown[]), value];
+      (group.value as unknown[]).push(value);
       continue;
     }
 
@@ -654,7 +707,9 @@ export function valuesMap(
     // не читаются, но и не стираются: включат флаг обратно — вернутся
     if (row.domainIds) continue;
     if (property.multiple === true) {
-      values[property.code] = [...((values[property.code] as unknown[]) ?? []), value];
+      const items = (values[property.code] as unknown[] | undefined) ?? [];
+      items.push(value);
+      values[property.code] = items;
     } else if (values[property.code] === undefined) {
       values[property.code] = value;
     }

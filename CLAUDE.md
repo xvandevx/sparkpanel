@@ -464,7 +464,9 @@ Swagger на `/api/docs`.
   `items`, `items/{idOrCode}`, `items/external/{externalId}`, `properties`, `facets`; списки — `/pages`,
   `/contents/{код типа}`, `/catalog/products`, `/catalog/categories`, `/domains`
   (`api-lists.ts`). Свойства — объектом по коду, «Список» — кодом варианта, скрытые —
-  никогда; отбор — общий `pageRecords`, `filter[код]` переводит `external-values.ts`.
+  никогда; отбор — общий `pageRecords`, `filter[код]` переводит `external-values.ts`; значения
+  читаются только нужные (свойства фильтра, записи страницы), привязки сужаются в базе
+  по индексу `infoblock_values_property_link`.
   **Спецификацию OpenAPI сервер собирает из настроек списков** (`openapi-spec.ts`,
   `/api/v1/openapi.json`) — руками документацию не пишем. Ключи — `api_keys` (хэш SHA-256,
   ключ виден один раз); управляет ими root (`/api/external-api`, `RootOnlyGuard` из `common/`).

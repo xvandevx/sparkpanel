@@ -719,7 +719,10 @@ const unique = <T>(list: T[]): T[] => Array.from(new Set(list));
 
 function uniqueBy<T>(list: T[], key: (item: T) => string): T[] {
   const seen = new Map<string, T>();
-  for (const item of list) if (!seen.has(key(item))) seen.set(key(item), item);
+  for (const item of list) {
+    const itemKey = key(item);
+    if (!seen.has(itemKey)) seen.set(itemKey, item);
+  }
   return Array.from(seen.values());
 }
 
