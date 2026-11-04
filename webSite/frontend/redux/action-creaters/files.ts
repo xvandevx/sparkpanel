@@ -1,5 +1,5 @@
 import type { Dispatch } from 'redux';
-import { fetchFiles, removeFile, uploadFile, type UploadTarget } from '../../api/files';
+import { fetchFiles, importFile, removeFile, uploadFile, type UploadTarget } from '../../api/files';
 import type { FileDto } from '../../src/api/client';
 import { apiErrorMessage } from '../apiError';
 import type { RootState } from '..';
@@ -41,6 +41,20 @@ export const uploadFileThunk =
     }
     await refresh(dispatch);
     return { file: uploaded, error: null };
+  };
+
+/** Внешний файл по адресу — в своё хранилище, потом перечитанный список, как у загрузки. */
+export const importFileThunk =
+  (url: string, target: UploadTarget) =>
+  async (dispatch: Dispatch<FilesAction>): Promise<{ file: FileDto | null; error: string | null }> => {
+    let imported: FileDto;
+    try {
+      imported = await importFile(url, target);
+    } catch (error) {
+      return { file: null, error: apiErrorMessage(error, 'Не удалось забрать файл в хранилище') };
+    }
+    await refresh(dispatch);
+    return { file: imported, error: null };
   };
 
 /** Удаление файла; возвращает текст ошибки или null. */

@@ -1,3 +1,4 @@
+import { isPrivateAddress } from './fetch-external';
 import { contentDisposition, isInlineMime } from './file-disposition';
 import { fileCode, objectKeyOf } from './file-key';
 import { decodeOriginalName } from './files.service';
@@ -8,7 +9,9 @@ describe('fileCode', () => {
   });
 
   it('переводит кириллицу в латиницу', () => {
-    expect(fileCode('Вопросы и ответы — десктоп.pdf')).toBe('voprosy-i-otvety-desktop.pdf');
+    expect(fileCode('Вопросы и ответы — десктоп.pdf')).toBe(
+      'voprosy-i-otvety-desktop.pdf',
+    );
   });
 
   it('не оставляет файл без имени, даже если от него ничего не осталось', () => {
@@ -50,7 +53,7 @@ describe('contentDisposition', () => {
 
   it('пишет имя обоими способами: ASCII и RFC 5987', () => {
     expect(contentDisposition('image/png', 'Баннер.png')).toBe(
-      "inline; filename=\"______.png\"; filename*=UTF-8''%D0%91%D0%B0%D0%BD%D0%BD%D0%B5%D1%80.png",
+      'inline; filename="______.png"; filename*=UTF-8\'\'%D0%91%D0%B0%D0%BD%D0%BD%D0%B5%D1%80.png',
     );
   });
 
@@ -60,7 +63,9 @@ describe('contentDisposition', () => {
     expect(header).not.toContain('\r');
     expect(header).not.toContain('\n');
     // В ASCII-имени не должно остаться кавычки: она закрыла бы filename раньше времени
-    expect(header.match(/filename="([^"]*)"/)?.[1]).toBe('a__x=y__X-Evil: 1.html');
+    expect(header.match(/filename="([^"]*)"/)?.[1]).toBe(
+      'a__x=y__X-Evil: 1.html',
+    );
   });
 });
 
@@ -70,7 +75,40 @@ describe('decodeOriginalName', () => {
   });
 
   it('чинит кириллицу, прочитанную как latin1', () => {
-    const asMulterReadsIt = Buffer.from('Баннер.png', 'utf8').toString('latin1');
+    const asMulterReadsIt = Buffer.from('Баннер.png', 'utf8').toString(
+      'latin1',
+    );
     expect(decodeOriginalName(asMulterReadsIt)).toBe('Баннер.png');
+  });
+});
+
+describe('isPrivateAddress', () => {
+  it('во внутреннюю сеть и к метаданным облака не ходим', () => {
+    for (const address of [
+      '127.0.0.1',
+      '10.1.2.3',
+      '172.20.0.5',
+      '192.168.1.1',
+      '169.254.169.254',
+      '100.64.0.1',
+      '0.0.0.0',
+      '::1',
+      'fd00::1',
+      'fe80::1',
+      '::ffff:127.0.0.1',
+    ]) {
+      expect(isPrivateAddress(address)).toBe(true);
+    }
+  });
+
+  it('адреса интернета — можно', () => {
+    for (const address of [
+      '95.163.240.10',
+      '172.32.0.1',
+      '8.8.8.8',
+      '2a00:1450:4010::64',
+    ]) {
+      expect(isPrivateAddress(address)).toBe(false);
+    }
   });
 });

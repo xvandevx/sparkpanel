@@ -3,7 +3,7 @@ import { App, Dropdown } from 'antd';
 import { LoadingOutlined, PictureOutlined } from '@ant-design/icons';
 import type { Editor } from '@tiptap/react';
 import { uploadError, useFileActions, useFiles, type FileDto } from '../../../../logic/files';
-import FilePickerDrawer from '../FilePickerDrawer';
+import { FilePickerDrawer } from '../file';
 import type { EditorField } from '../record';
 import Tool from './Tool';
 

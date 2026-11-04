@@ -11,6 +11,17 @@ export { useFileSections } from './useFileSections';
 export { ALL_SECTIONS, pickerFiles, sectionTree, startSection, treeKeys } from './filePicker';
 export type { SectionNode } from './filePicker';
 export { fileLinks, formatFileDate, formatFileSize, isImageUrl, linkLabel } from './fileFormat';
-export { acceptOf, pickError, rulesHint, uploadError } from './fileRules';
+export { acceptOf, externalUrlError, pickError, rulesHint, uploadError } from './fileRules';
+export {
+  addFileItems,
+  externalFileName,
+  externalHost,
+  fileIdsOf,
+  fileItemsOf,
+  isExternalUrl,
+  removeFileItem,
+  replaceFileItem,
+} from './fileValue';
+export type { FileItem } from './fileValue';
 export type { FileRules } from './fileRules';
 export type { FileDto, FileLinkDto, FileSectionDto } from '../../src/api/client';

@@ -396,7 +396,10 @@ export class ExternalApiService {
           .filter((property) => types.includes(property.type))
           .flatMap((property) => itemsOf(values.get(String(row.id))?.get(property.id))),
       );
-    const fileIds = Array.from(new Set(valuesOf([PropertyType.File, PropertyType.Image]).map(Number)));
+    // Внешние файлы — адреса, читать их из «Файлов» нечего
+    const fileIds = Array.from(
+      new Set(valuesOf([PropertyType.File, PropertyType.Image]).filter((item) => typeof item === 'number')),
+    ) as number[];
     const [files, linkNames, expanded] = await Promise.all([
       this.files.findByIds(fileIds),
       this.linkNamesOf(linksOf(rows, linkProps, values), linkProps),
@@ -413,6 +416,7 @@ export class ExternalApiService {
             url: file.url.startsWith('/') ? origin + file.url : file.url,
             mimeType: file.mimeType,
             size: file.size,
+            isExternal: false,
           },
         ]),
       ),

@@ -48,8 +48,10 @@ const FORMATS: Record<PropertyType, string> = {
   [PropertyType.Text]: 'строка, можно в несколько строк',
   [PropertyType.Html]: 'строка с HTML-разметкой',
   [PropertyType.Number]: 'число',
-  [PropertyType.File]: 'номер файла — из upload_file или find_records по списку files.N',
-  [PropertyType.Image]: 'номер файла-изображения — из upload_file или find_records по списку files.N',
+  [PropertyType.File]:
+    'номер файла — из upload_file или find_records по списку files.N — или адрес внешнего файла "https://…" (не скачивается)',
+  [PropertyType.Image]:
+    'номер файла-изображения — из upload_file или find_records по списку files.N — или адрес внешней картинки "https://…" (не скачивается)',
   [PropertyType.List]: 'номер варианта — id из options',
   [PropertyType.ListOptionLink]: 'номер варианта — id из options',
   [PropertyType.ContentLink]: 'ссылка на запись: { "listKey": "content-items.3", "recordId": "12" }',

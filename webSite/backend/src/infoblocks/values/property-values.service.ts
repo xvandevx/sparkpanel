@@ -20,7 +20,9 @@ import {
   DomainGroup,
   PropertyType,
   PropertyValueMap,
+  externalRuleError,
   fileRuleError,
+  isExternalUrl,
   normalizeValues,
   plainValues,
   referencedDomainIds,
@@ -589,6 +591,17 @@ export class PropertyValuesService implements OnApplicationBootstrap {
     transaction: Transaction,
   ): Promise<void> {
     const fileTypes = [PropertyType.File, PropertyType.Image];
+
+    // Внешний файл — адрес: его не скачиваем, сверяем только расширение с форматами
+    for (const property of properties) {
+      if (!fileTypes.includes(property.type) || values[property.code] === undefined) continue;
+      const items = [values[property.code]].flat();
+      for (const url of items.filter(isExternalUrl)) {
+        const error = externalRuleError(property, url);
+        if (error) throw new BadRequestException(error);
+      }
+    }
+
     const ids = referencedIds(properties, values, fileTypes);
     if (ids.length === 0) return;
 
@@ -805,16 +818,22 @@ interface ValueColumns {
 const EMPTY_COLUMNS: ValueColumns = { text: null, number: null, json: null, optionId: null };
 
 /**
- * Значение — в свою колонку. Числа, файлы и изображения в `number`, таблица
+ * Значение — в свою колонку. Числа, файлы и изображения в `number` (внешний
+ * файл — адресом в `text`), таблица
  * и привязка в `json`, вариант списка в `optionId`, остальное в `text`:
  * иначе по значению не отсортируешь.
  */
 function encode(property: InfoblockPropertyDto, value: unknown): ValueColumns {
   switch (property.type) {
     case PropertyType.Number:
+      return { ...EMPTY_COLUMNS, number: Number(value) };
+
+    // Свой файл — номером в `number`, внешний — адресом в `text`
     case PropertyType.File:
     case PropertyType.Image:
-      return { ...EMPTY_COLUMNS, number: Number(value) };
+      return typeof value === 'string'
+        ? { ...EMPTY_COLUMNS, text: value }
+        : { ...EMPTY_COLUMNS, number: Number(value) };
 
     case PropertyType.List:
     case PropertyType.ListOptionLink:
@@ -834,9 +853,11 @@ function encode(property: InfoblockPropertyDto, value: unknown): ValueColumns {
 function decode(property: InfoblockPropertyDto, row: PropertyValue): unknown {
   switch (property.type) {
     case PropertyType.Number:
+      return row.number ?? null;
+
     case PropertyType.File:
     case PropertyType.Image:
-      return row.number ?? null;
+      return row.number ?? row.text ?? null;
 
     case PropertyType.List:
     case PropertyType.ListOptionLink:

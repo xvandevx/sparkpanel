@@ -1,6 +1,6 @@
 import { Button, Input, InputNumber, Select, Space, Switch, TreeSelect } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
-import FileField from './FileField';
+import { FileField } from './file';
 import { HtmlField } from './html';
 import LinkField from './LinkField';
 import TableField from './TableField';

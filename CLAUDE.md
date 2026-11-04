@@ -363,7 +363,10 @@ Swagger на `/api/docs`.
   в названии («Контент / SEO / Мета-теги», `group-…`) сервер собирает по файлам при выдаче
   (`sections/section-groups.ts`), наружу — `isReadOnly`, у группы ещё `isGroup`. **Привязка файла к записи — значение свойства**
   (`infoblock_values.number`), отдельной таблицы связей нет: один файл могут выбрать
-  сколько угодно записей. Подробности — [`docs/files.md`](docs/files.md).
+  сколько угодно записей. **Значение может быть и внешним файлом** — адресом `https://…`
+  в `infoblock_values.text` (картинки старого сайта без перекачки); сервер его не скачивает,
+  а «Забрать в хранилище» (`POST /api/infoblocks/files/import`, без внутренней сети —
+  `files/fetch-external.ts`) кладёт его к себе. Подробности — [`docs/files.md`](docs/files.md).
 - **Формы обратной связи:** два списка редактора — формы (`infoblocks/forms/`,
   `infoblock_forms`, `/api/infoblocks/forms`, ключ `forms`) и поля форм
   (`infoblocks/forms/fields/`, `infoblock_forms_fields`, `/api/infoblocks/forms/fields`,

@@ -146,19 +146,20 @@ export const MCP_TOOLS: McpToolDefinition[] = [
   {
     name: 'upload_file',
     description:
-      'Загрузить файл до 18 МБ (base64 в теле вызова): в раздел «Файлов» (sectionId — номер записи списка file-sections) или для свойства ' +
+      'Загрузить файл до 18 МБ (base64 в теле вызова) или забрать к себе внешний по адресу (url, до 20 МБ — скачивает сервер): ' +
+      'в раздел «Файлов» (sectionId — номер записи списка file-sections) или для свойства ' +
       '«Файл»/«Изображение» (propertyId — его номер, как в разделе свойства). В ответе номер файла — его пишут ' +
-      'в значение свойства через save_record.',
+      'в значение свойства через save_record. Внешний файл можно и не забирать: адрес "https://…" пишется в значение как есть.',
     inputSchema: object(
       {
-        fileName: { type: 'string', description: 'Имя с расширением: photo.jpg' },
+        fileName: { type: 'string', description: 'Имя с расширением: photo.jpg; при url — не нужно' },
         contentBase64: { type: 'string', description: 'Содержимое файла в base64' },
+        url: { type: 'string', description: 'Вместо fileName и contentBase64: адрес внешнего файла http(s)' },
         mimeType: { type: 'string', description: 'Не указан — по расширению' },
         sectionId: { type: 'integer', minimum: 1 },
         propertyCode: { type: 'string', description: 'Вместо sectionId: код свойства «Файл»/«Изображение» …' },
         list: { ...LIST, description: '… и ключ его списка' },
       },
-      ['fileName', 'contentBase64'],
     ),
     annotations: { readOnlyHint: false, destructiveHint: false },
   },

@@ -1,4 +1,5 @@
 import type { FileDto } from '../../src/api/client';
+import { externalFileName, isExternalUrl } from './fileValue';
 
 /**
  * Ограничения поля «Файл» и «Изображение»: только картинки, формат, вес,
@@ -65,6 +66,18 @@ function ruleError(
   }
 
   return null;
+}
+
+/**
+ * Почему внешний адрес не подходит полю; null — подходит. Как у сервера:
+ * проверяется только формат, по расширению в адресе, а адрес без расширения
+ * пропускается. Вес и разрешение чужого файла не узнать, не скачав его.
+ */
+export function externalUrlError(url: string, rules: FileRules): string | null {
+  if (!isExternalUrl(url)) return 'нужен адрес вида https://…';
+  const extension = extensionOf(externalFileName(url));
+  if (!extension || rules.formats.length === 0 || formatMatches(extension, rules.formats)) return null;
+  return `формат не подходит, нужен ${rules.formats.join(', ')}`;
 }
 
 /** Подсказка окну выбора файла: оно сразу покажет только подходящие. */

@@ -2,6 +2,8 @@ import { BadRequestException } from '@nestjs/common';
 import { CONTENTS_LIST } from '../infoblocks/contents/content-lists';
 import { FilterKind, type PageRow, type RecordFilter, type RecordValues } from '../infoblocks/records/records-page';
 import {
+  externalFileName,
+  isExternalUrl,
   isLinkType,
   linkKey,
   PropertyType,
@@ -22,14 +24,28 @@ import {
 /** Свойство, которое API отдаёт: не скрытое, сохранённое (с номером). */
 export type ApiPropertyDef = PropertyDef & { id: number };
 
-/** Файл или изображение в ответе. */
+/**
+ * Файл или изображение в ответе. Внешний файл (значение — адрес, файл лежит
+ * на чужом сервере) приходит той же формой: без номера, типа и веса, с `isExternal`.
+ */
 export interface ApiFile {
-  id: number;
+  id: number | null;
   name: string;
   url: string;
-  mimeType: string;
-  size: number;
+  mimeType: string | null;
+  size: number | null;
+  isExternal: boolean;
 }
+
+/** Внешний файл в ответе: всё, что о нём известно, — адрес. */
+export const externalApiFile = (url: string): ApiFile => ({
+  id: null,
+  name: externalFileName(url),
+  url,
+  mimeType: null,
+  size: null,
+  isExternal: true,
+});
 
 /** Привязка к записи в ответе: список, номер и название записи. */
 export interface ApiLink {
@@ -119,7 +135,7 @@ export function apiValue(property: ApiPropertyDef, value: unknown, context: Valu
         return property.options.find((option) => option.id === item)?.code ?? null;
       case PropertyType.File:
       case PropertyType.Image:
-        return context.files.get(Number(item)) ?? null;
+        return isExternalUrl(item) ? externalApiFile(item) : context.files.get(Number(item)) ?? null;
       case PropertyType.ContentLink:
       case PropertyType.ContentTypeLink: {
         const link = item as ContentLink;

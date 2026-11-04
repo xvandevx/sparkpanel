@@ -5,6 +5,7 @@ All URIs are relative to *http://localhost*
 |Method | HTTP request | Description|
 |------------- | ------------- | -------------|
 |[**filesControllerFindAll**](#filescontrollerfindall) | **GET** /api/infoblocks/files | Файлы раздела; без sectionId — все, с привязками к записям|
+|[**filesControllerImportUrl**](#filescontrollerimporturl) | **POST** /api/infoblocks/files/import | Забрать внешний файл по адресу в хранилище — в раздел или в раздел свойства|
 |[**filesControllerRemove**](#filescontrollerremove) | **DELETE** /api/infoblocks/files/{id} | Удалить файл: записи его забудут, объект уйдёт из хранилища|
 |[**filesControllerUpdate**](#filescontrollerupdate) | **PATCH** /api/infoblocks/files/{id} | Поправить имя и описание файла|
 |[**filesControllerUpload**](#filescontrollerupload) | **POST** /api/infoblocks/files/upload | Загрузить файл в раздел или в раздел свойства|
@@ -59,6 +60,59 @@ const { status, data } = await apiInstance.filesControllerFindAll(
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 |**200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **filesControllerImportUrl**
+> FileDto filesControllerImportUrl(importFileDto)
+
+
+### Example
+
+```typescript
+import {
+    InfoblockFilesApi,
+    Configuration,
+    ImportFileDto
+} from './api';
+
+const configuration = new Configuration();
+const apiInstance = new InfoblockFilesApi(configuration);
+
+let importFileDto: ImportFileDto; //
+
+const { status, data } = await apiInstance.filesControllerImportUrl(
+    importFileDto
+);
+```
+
+### Parameters
+
+|Name | Type | Description  | Notes|
+|------------- | ------------- | ------------- | -------------|
+| **importFileDto** | **ImportFileDto**|  | |
+
+
+### Return type
+
+**FileDto**
+
+### Authorization
+
+[JWT-auth](../README.md#JWT-auth)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+|**200** |  |  -  |
+|**400** | Адрес не http(s) или из внутренней сети, файл не скачался или больше 20 МБ, хранилище не приняло |  -  |
+|**404** | Раздел или свойство не найдены |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 

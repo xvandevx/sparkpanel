@@ -50,7 +50,7 @@ const categories = property({ id: 6, code: 'categories', type: PropertyType.Cont
 const photo = property({ id: 7, code: 'photo', type: PropertyType.Image });
 
 const context: ValueContext = {
-  files: new Map([[41, { id: 41, name: 'Фото', url: 'http://site/uploads/41.jpg', mimeType: 'image/jpeg', size: 10 }]]),
+  files: new Map([[41, { id: 41, name: 'Фото', url: 'http://site/uploads/41.jpg', mimeType: 'image/jpeg', size: 10, isExternal: false }]]),
   linkNames: new Map([['product-categories/3', 'Фаркопы']]),
   expanded: new Map(),
 };
@@ -70,6 +70,15 @@ describe('domainValue', () => {
 describe('apiValue', () => {
   it('«Список» — кодом варианта', () => expect(apiValue(brand, 11, context)).toBe('thule'));
   it('изображение — файлом с адресом', () => expect(apiValue(photo, 41, context)).toMatchObject({ id: 41, url: 'http://site/uploads/41.jpg' }));
+  it('внешнее изображение — той же формой, без номера', () =>
+    expect(apiValue(photo, 'https://old.site/upload/logo.png', context)).toEqual({
+      id: null,
+      name: 'logo.png',
+      url: 'https://old.site/upload/logo.png',
+      mimeType: null,
+      size: null,
+      isExternal: true,
+    }));
   it('привязка — списком, номером и названием', () =>
     expect(apiValue(categories, [{ listKey: 'product-categories', recordId: '3' }], context)).toEqual([
       { list: 'product-categories', id: 3, name: 'Фаркопы' },

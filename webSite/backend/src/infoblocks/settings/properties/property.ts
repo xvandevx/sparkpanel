@@ -9,9 +9,12 @@ export enum PropertyType {
   /** Однострочный текст */
   String = 'string',
   Number = 'number',
-  /** Файл медиатеки: значение — номер файла */
+  /** Файл: номер файла медиатеки или адрес внешнего файла (`https://…`) */
   File = 'file',
-  /** Изображение медиатеки: номер файла, с ограничением формата, веса и разрешения */
+  /**
+   * Изображение: номер файла медиатеки, с ограничением формата, веса
+   * и разрешения, или адрес внешней картинки (`https://…`)
+   */
   Image = 'image',
   /** Значение из заданных в настройках вариантов */
   List = 'list',
@@ -370,7 +373,9 @@ export function referencedIds(
 ): number[] {
   const ids = properties
     .filter((property) => types.includes(property.type) && values[property.code] !== undefined)
-    .flatMap((property) => toArray(values[property.code]) as number[]);
+    .flatMap((property) => toArray(values[property.code]))
+    // У файла значение бывает и внешним адресом — это не ссылка на запись
+    .filter((id): id is number => typeof id === 'number');
   return unique(ids);
 }
 
@@ -444,6 +449,43 @@ export function fileRuleError(property: PropertyDef, file: FileFacts): string | 
   return null;
 }
 
+/**
+ * Внешний файл — адрес `http(s)://` без пробелов. Значение свойства «Файл»
+ * и «Изображение» — либо номер своего файла, либо такой адрес: так заводят
+ * картинки, которые лежат на старом сайте, не перекачивая их к себе.
+ */
+export const EXTERNAL_URL_MAX_LENGTH = 2000;
+const EXTERNAL_URL_PATTERN = /^https?:\/\/[^\s/?#]+[^\s]*$/i;
+
+export const isExternalUrl = (value: unknown): value is string =>
+  typeof value === 'string' &&
+  value.length <= EXTERNAL_URL_MAX_LENGTH &&
+  EXTERNAL_URL_PATTERN.test(value);
+
+/** Имя внешнего файла — последний кусок пути адреса, без запроса. */
+export function externalFileName(url: string): string {
+  const path = url.replace(/[?#].*$/, '').replace(/\/+$/, '');
+  const name = path.slice(path.lastIndexOf('/') + 1);
+  try {
+    return decodeURIComponent(name);
+  } catch {
+    return name;
+  }
+}
+
+/**
+ * Подходит ли внешний адрес под форматы свойства — по расширению в адресе.
+ * Вес, тип и разрешение не проверяются: сервер файл не скачивает, иначе
+ * импорт тысяч записей ждал бы чужой сервер. Адрес без расширения
+ * (`/image?id=5`) пропускаем — формат по нему не понять.
+ */
+export function externalRuleError(property: PropertyDef, url: string): string | null {
+  const extension = extensionOf(externalFileName(url));
+  if (!extension || property.formats.length === 0) return null;
+  if (formatMatches(extension, property.formats)) return null;
+  return `«${externalFileName(url)}»: формат не подходит, нужен ${property.formats.join(', ')}`;
+}
+
 /** Плоский снимок для журнала: ключи совпадают с полями формы (`props.price`). */
 export function valuesSnapshot(values: PropertyValueMap): Record<string, unknown> {
   const snapshot: Record<string, unknown> = {};
@@ -509,7 +551,7 @@ function normalizeValue(property: PropertyDef, raw: unknown): Normalized {
 
     case PropertyType.File:
     case PropertyType.Image:
-      return normalizeMany(property, raw, toId, true);
+      return normalizeMany(property, raw, toFile, true);
 
     case PropertyType.ContentLink:
     case PropertyType.ContentTypeLink: {
@@ -618,6 +660,15 @@ function toNumber(raw: unknown): Normalized {
 function toId(raw: unknown): Normalized {
   const value = typeof raw === 'string' ? Number(raw) : raw;
   return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : INVALID;
+}
+
+/** Файл — номер своего файла или адрес внешнего. */
+function toFile(raw: unknown): Normalized {
+  if (typeof raw === 'string' && /^https?:/i.test(raw.trim())) {
+    const url = raw.trim();
+    return isExternalUrl(url) ? url : INVALID;
+  }
+  return toId(raw);
 }
 
 const LINK_PART_PATTERN = /^[a-z0-9][a-z0-9.-]{0,63}$/;

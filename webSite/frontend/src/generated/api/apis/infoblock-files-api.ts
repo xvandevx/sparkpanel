@@ -24,6 +24,8 @@ import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError
 // @ts-ignore
 import type { FileDto } from '../models';
 // @ts-ignore
+import type { ImportFileDto } from '../models';
+// @ts-ignore
 import type { UpdateFileDto } from '../models';
 /**
  * InfoblockFilesApi - axios parameter creator
@@ -69,6 +71,46 @@ export const InfoblockFilesApiAxiosParamCreator = function (configuration?: Conf
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Забрать внешний файл по адресу в хранилище — в раздел или в раздел свойства
+         * @param {ImportFileDto} importFileDto 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        filesControllerImportUrl: async (importFileDto: ImportFileDto, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'importFileDto' is not null or undefined
+            assertParamExists('filesControllerImportUrl', 'importFileDto', importFileDto)
+            const localVarPath = `/api/infoblocks/files/import`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication JWT-auth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(importFileDto, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -238,6 +280,19 @@ export const InfoblockFilesApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary Забрать внешний файл по адресу в хранилище — в раздел или в раздел свойства
+         * @param {ImportFileDto} importFileDto 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async filesControllerImportUrl(importFileDto: ImportFileDto, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<FileDto>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.filesControllerImportUrl(importFileDto, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InfoblockFilesApi.filesControllerImportUrl']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary Удалить файл: записи его забудут, объект уйдёт из хранилища
          * @param {number} id 
          * @param {*} [options] Override http request option.
@@ -301,6 +356,16 @@ export const InfoblockFilesApiFactory = function (configuration?: Configuration,
         },
         /**
          * 
+         * @summary Забрать внешний файл по адресу в хранилище — в раздел или в раздел свойства
+         * @param {ImportFileDto} importFileDto 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        filesControllerImportUrl(importFileDto: ImportFileDto, options?: RawAxiosRequestConfig): AxiosPromise<FileDto> {
+            return localVarFp.filesControllerImportUrl(importFileDto, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary Удалить файл: записи его забудут, объект уйдёт из хранилища
          * @param {number} id 
          * @param {*} [options] Override http request option.
@@ -353,6 +418,18 @@ export class InfoblockFilesApi extends BaseAPI {
      */
     public filesControllerFindAll(sectionId?: number, propertyId?: number, options?: RawAxiosRequestConfig) {
         return InfoblockFilesApiFp(this.configuration).filesControllerFindAll(sectionId, propertyId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Забрать внешний файл по адресу в хранилище — в раздел или в раздел свойства
+     * @param {ImportFileDto} importFileDto 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof InfoblockFilesApi
+     */
+    public filesControllerImportUrl(importFileDto: ImportFileDto, options?: RawAxiosRequestConfig) {
+        return InfoblockFilesApiFp(this.configuration).filesControllerImportUrl(importFileDto, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

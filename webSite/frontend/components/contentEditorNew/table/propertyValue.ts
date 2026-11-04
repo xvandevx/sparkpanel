@@ -3,7 +3,7 @@ import { domainValuesOf, ownDomainCount } from '../../../logic/domains';
 import { htmlText } from '../../../logic/htmlText';
 import { PropertyType } from '../../../logic/listSettings';
 import { plural } from '../../../logic/plural';
-import type { FileDto } from '../../../logic/files';
+import { externalFileName, isExternalUrl, type FileDto } from '../../../logic/files';
 import type { EditorProperty } from '../../../redux/reducers/contentEditorNewReducer';
 
 /**
@@ -67,15 +67,22 @@ function singleValue(
       const options = (property.options as { id: number; name: string }[] | undefined) ?? [];
       return text(items.map((id) => options.find((option) => option.id === Number(id))?.name ?? String(id)));
     }
+    // Внешний файл — адрес: имя берётся из адреса, превью — по нему же
     case PropertyType.File:
-      return text(items.map((id) => lookup.fileById.get(Number(id))?.name ?? ''));
-    case PropertyType.Image: {
-      const files = items.map((id) => lookup.fileById.get(Number(id)));
+      return text(
+        items.map((item) =>
+          isExternalUrl(item) ? externalFileName(item) : (lookup.fileById.get(Number(item))?.name ?? ''),
+        ),
+      );
+    case PropertyType.Image:
       return {
         text: '',
-        images: files.flatMap((file) => (file ? [file.url] : [])),
+        images: items.flatMap((item) => {
+          if (isExternalUrl(item)) return [item];
+          const file = lookup.fileById.get(Number(item));
+          return file ? [file.url] : [];
+        }),
       };
-    }
     case PropertyType.ContentLink:
     case PropertyType.ContentTypeLink:
       return text(items.map((link) => lookup.linkNames.get(linkKeyOf(link) ?? '') ?? ''));

@@ -107,7 +107,10 @@ function inputValueSchema(property: ApiPropertyDef): Schema {
       };
     case PropertyType.File:
     case PropertyType.Image:
-      return { type: 'integer', description: 'Номер уже загруженного файла' };
+      return {
+        anyOf: [{ type: 'integer' }, { type: 'string', format: 'uri' }],
+        description: 'Номер уже загруженного файла или адрес внешнего (`https://…`): он не скачивается',
+      };
     case PropertyType.ContentLink:
     case PropertyType.ContentTypeLink:
       return ref('LinkInput');
@@ -523,7 +526,7 @@ const INTRO = `Данные сайта из SparkPanel: чтение для са
 
 **Запись.** Создать — \`POST /items\`, изменить — \`PATCH /items/{idOrCode}\`, удалить — \`DELETE\`. Интеграции удобнее внешний ID — номер записи в её системе: \`PUT /items/external/{externalId}\` заводит запись или правит существующую, \`POST /items/batch\` делает то же пакетом до ${BATCH_LIMIT} записей. Тело — \`{ fields, properties }\`: свойства по коду, «Список» — кодом или номером варианта, привязка — номером, кодом или \`{ "externalId": "…" }\`, файл — номером загруженного файла. \`null\` стирает значение, неприсланное не трогается. Записанное сразу публикуется; проверки и журнал — те же, что в панели.
 
-**Свойства** приходят объектом \`properties\` по коду свойства: «Список» — кодом варианта, файл и изображение — объектом \`File\`, привязка — объектом \`Link\`. Скрытые свойства не отдаются.
+**Свойства** приходят объектом \`properties\` по коду свойства: «Список» — кодом варианта, файл и изображение — объектом \`File\` (внешний — с \`isExternal\`), привязка — объектом \`Link\`. Скрытые свойства не отдаются.
 
 **Связи:** \`expand=код,код\` у \`/items\` и \`/items/{idOrCode}\` — привязки этих свойств приходят записями целиком, на один уровень. Какие коды можно, сказано у метода.
 
@@ -544,13 +547,16 @@ const upsertSchemaName = (list: ApiList): string => `${list.schema}Upsert`;
 const SHARED_SCHEMAS: Record<string, Schema> = {
   File: {
     type: 'object',
-    required: ['id', 'name', 'url', 'mimeType', 'size'],
+    description:
+      'Файл панели или внешний файл — адрес на чужом сервере (`isExternal`): у внешнего нет номера, типа и веса',
+    required: ['id', 'name', 'url', 'mimeType', 'size', 'isExternal'],
     properties: {
-      id: { type: 'integer' },
-      name: { type: 'string' },
+      id: { type: ['integer', 'null'], description: 'Номер файла; у внешнего — null' },
+      name: { type: 'string', description: 'Имя файла; у внешнего — из адреса' },
       url: { type: 'string', format: 'uri' },
-      mimeType: { type: 'string' },
-      size: { type: 'integer', description: 'Байт' },
+      mimeType: { type: ['string', 'null'] },
+      size: { type: ['integer', 'null'], description: 'Байт' },
+      isExternal: { type: 'boolean', description: 'Файл лежит по внешнему адресу, не в панели' },
     },
   },
   Link: {

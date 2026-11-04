@@ -74,6 +74,7 @@ docs/HistoryApi.md
 docs/HistoryClearDto.md
 docs/HistoryPageDto.md
 docs/HistoryRecordDto.md
+docs/ImportFileDto.md
 docs/InfoblockBackupsApi.md
 docs/InfoblockColumnDto.md
 docs/InfoblockColumnsApi.md
@@ -186,6 +187,7 @@ models/form-field-dto.ts
 models/history-clear-dto.ts
 models/history-page-dto.ts
 models/history-record-dto.ts
+models/import-file-dto.ts
 models/index.ts
 models/infoblock-column-dto.ts
 models/infoblock-property-dto.ts

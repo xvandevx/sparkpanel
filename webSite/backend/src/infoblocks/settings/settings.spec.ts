@@ -12,6 +12,8 @@ import {
   PropertyDef,
   PropertyType,
   canChangeType,
+  externalFileName,
+  externalRuleError,
   normalizeProperties,
   normalizeTabs,
   normalizeValues,
@@ -696,5 +698,41 @@ describe('мультидоменные значения', () => {
     };
     expect(plainValues([gallery], values).gallery).toEqual([1, 4, 1]);
     expect(referencedDomainIds([gallery], values).sort()).toEqual([2, 3, 5]);
+  });
+});
+
+describe('внешние файлы', () => {
+  const logo = property({ code: 'logo', name: 'Логотип', type: PropertyType.Image, formats: ['png', 'jpg'] });
+  const docs = property({ code: 'docs', name: 'Документы', type: PropertyType.File, multiple: true });
+  const url = 'https://s3.twcstorage.ru/upload/iblock/174/1747.png';
+
+  it('значение — номер своего файла или адрес внешнего, вперемешку', () => {
+    const { values, errors } = normalizeValues(
+      [logo, docs],
+      { logo: ` ${url} `, docs: [5, 'https://site.ru/files/manual.pdf', 5, '7'] },
+      true,
+    );
+    expect(errors).toEqual([]);
+    expect(values).toEqual({ logo: url, docs: [5, 'https://site.ru/files/manual.pdf', 7] });
+  });
+
+  it('строка, которая не номер и не адрес http(s), — ошибка', () => {
+    for (const bad of ['logo.png', 'ftp://site.ru/a.png', 'https://site.ru/a b.png', 'https://']) {
+      expect(normalizeValues([logo], { logo: bad }, true).errors).toHaveLength(1);
+    }
+  });
+
+  it('в ссылки на файлы адреса не попадают', () => {
+    expect(referencedIds([docs], { docs: [5, url] }, [PropertyType.File])).toEqual([5]);
+  });
+
+  it('формат сверяется по расширению в адресе, без расширения — пропускается', () => {
+    expect(externalRuleError(logo, url)).toBeNull();
+    expect(externalRuleError(logo, 'https://site.ru/a.webp?v=2')).toMatch(/формат не подходит/);
+    expect(externalRuleError(logo, 'https://site.ru/image?id=5')).toBeNull();
+  });
+
+  it('имя — последний кусок пути, без запроса', () => {
+    expect(externalFileName('https://site.ru/files/%D0%A1%D0%B5%D1%80%D1%82.pdf?x=1')).toBe('Серт.pdf');
   });
 });

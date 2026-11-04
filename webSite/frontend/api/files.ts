@@ -33,6 +33,15 @@ export const uploadFile = async (file: File, target: UploadTarget): Promise<File
   return data;
 };
 
+/**
+ * «Забрать в хранилище»: внешний файл по адресу скачивает сервер и кладёт
+ * к себе — туда же, куда легла бы загрузка с диска.
+ */
+export const importFile = async (url: string, target: UploadTarget): Promise<FileDto> => {
+  const { data } = await api.infoblockFiles.filesControllerImportUrl({ url, ...target });
+  return data;
+};
+
 /** Имя и описание файла — то, что правят в его карточке. */
 export const updateFile = async (id: number, dto: UpdateFileDto): Promise<FileDto> => {
   const { data } = await api.infoblockFiles.filesControllerUpdate(id, dto);

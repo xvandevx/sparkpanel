@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { UploadTarget } from '../../api/files';
 import type { AppDispatch, RootState } from '../../redux';
-import { loadFilesThunk, removeFileThunk, uploadFileThunk } from '../../redux/action-creaters/files';
+import {
+  importFileThunk,
+  loadFilesThunk,
+  removeFileThunk,
+  uploadFileThunk,
+} from '../../redux/action-creaters/files';
 
 /**
  * Файлы пользователя — один список на раздел «Файлы» и на поле файла в карточке
@@ -27,7 +32,7 @@ export function useFiles(isEnabled = true) {
 }
 
 /**
- * Что делают с файлом: загрузить и удалить. Ошибку возвращают текстом —
+ * Что делают с файлом: загрузить, забрать внешний по адресу и удалить. Ошибку возвращают текстом —
  * показывает её тот, кто звал: у раздела и у карточки слова разные.
  */
 export function useFileActions() {
@@ -37,7 +42,11 @@ export function useFileActions() {
     (file: File, target: UploadTarget) => dispatch(uploadFileThunk(file, target)),
     [dispatch],
   );
+  const importUrl = useCallback(
+    (url: string, target: UploadTarget) => dispatch(importFileThunk(url, target)),
+    [dispatch],
+  );
   const remove = useCallback((id: number) => dispatch(removeFileThunk(id)), [dispatch]);
 
-  return { upload, remove };
+  return { upload, importUrl, remove };
 }

@@ -314,23 +314,22 @@ export class McpToolsService {
   }
 
   private async uploadFile(user: JwtPayload, args: Args): Promise<ToolOutcome> {
+    const target = await this.uploadTarget(user, args);
+    const url = optionalText(args, 'url');
+    if (url !== undefined) {
+      // Внешний файл качает сам маршрут панели — с его проверками адреса и веса
+      const file = await this.panel.post<Row>(user, '/infoblocks/files/import', { url, ...numbers(target) });
+      return {
+        data: file,
+        what: `Файлы · #${file.id} «${file.name ?? url}»`,
+        detail: url,
+        result: 'Забрано по адресу',
+      };
+    }
+
     const fileName = text(args, 'fileName');
     const content = Buffer.from(text(args, 'contentBase64'), 'base64');
     if (content.length === 0) throw new BadRequestException('Файл пустой');
-
-    const sectionId = optionalNumber(args, 'sectionId');
-    const propertyCode = optionalText(args, 'propertyCode');
-    let target: Record<string, string>;
-    if (sectionId !== undefined) {
-      target = { sectionId: String(sectionId) };
-    } else if (propertyCode !== undefined) {
-      const loaded = await this.load(user, text(args, 'list'));
-      const property = loaded.properties.find((item) => item.code === propertyCode);
-      if (!property || property.id === undefined) throw new BadRequestException(`Нет свойства «${propertyCode}»`);
-      target = { propertyId: String(property.id) };
-    } else {
-      throw new BadRequestException('Куда загрузить: sectionId или propertyCode со списком');
-    }
 
     const file = await this.panel.upload<Row>(
       user,
@@ -344,6 +343,24 @@ export class McpToolsService {
       detail: `${Math.ceil(content.length / 1024)} КБ`,
       result: 'Загружено',
     };
+  }
+
+  /** Куда ложится файл: раздел «Файлов» или свойство — полями multipart, строками. */
+  private async uploadTarget(user: JwtPayload, args: Args): Promise<Record<string, string>> {
+    const sectionId = optionalNumber(args, 'sectionId');
+    const propertyCode = optionalText(args, 'propertyCode');
+    let target: Record<string, string>;
+    if (sectionId !== undefined) {
+      target = { sectionId: String(sectionId) };
+    } else if (propertyCode !== undefined) {
+      const loaded = await this.load(user, text(args, 'list'));
+      const property = loaded.properties.find((item) => item.code === propertyCode);
+      if (!property || property.id === undefined) throw new BadRequestException(`Нет свойства «${propertyCode}»`);
+      target = { propertyId: String(property.id) };
+    } else {
+      throw new BadRequestException('Куда загрузить: sectionId или propertyCode со списком');
+    }
+    return target;
   }
 
   private async load(user: JwtPayload, listKey: string): Promise<Loaded> {
@@ -466,3 +483,7 @@ const optionalArray = <T>(args: Args, key: string): T[] | undefined => {
   if (!Array.isArray(value)) throw new BadRequestException(`${key} — массив`);
   return value as T[];
 };
+
+/** Поля multipart (строки) — числами для JSON-тела. */
+const numbers = (fields: Record<string, string>) =>
+  Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, Number(value)]));

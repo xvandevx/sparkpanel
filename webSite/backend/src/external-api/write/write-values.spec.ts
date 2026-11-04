@@ -89,3 +89,18 @@ describe('свойства записи по API — в значения пан�
     await expect(panelValues([color], { colour: 'black' }, resolve)).rejects.toThrow('Нет свойства «colour». Есть: color');
   });
 });
+
+describe('panelValues: внешние файлы', () => {
+  const gallery = property({ id: 9, code: 'gallery', name: 'Фото', type: PropertyType.Image, multiple: true });
+
+  it('принимает номер, адрес и объект File из чтения', async () => {
+    const values = await panelValues(
+      [gallery],
+      { gallery: [5, 'https://old.site/a.png', { id: 6 }, { id: null, url: 'https://old.site/b.png' }] },
+      resolve,
+    );
+    expect(values).toEqual([
+      { propertyId: 9, value: [5, 'https://old.site/a.png', 6, 'https://old.site/b.png'] },
+    ]);
+  });
+});

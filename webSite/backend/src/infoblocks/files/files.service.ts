@@ -12,7 +12,9 @@ import { StoragesService } from '../storages/storages.service';
 import { PropertyValuesService } from '../values/property-values.service';
 import { FileDto } from './dto/file.dto';
 import { UpdateFileDto } from './dto/update-file.dto';
+import { ImportFileDto } from './dto/import-file.dto';
 import { UploadFileDto } from './dto/upload-file.dto';
+import { fetchExternal, type FetchedFile } from './fetch-external';
 import { contentDisposition } from './file-disposition';
 import { fileCode, objectKeyOf } from './file-key';
 import { fileListKey } from './file-lists';
@@ -103,16 +105,38 @@ export class FilesService {
     upload: Express.Multer.File | undefined,
   ): Promise<FileDto> {
     if (!upload) throw new BadRequestException('Файл не передан');
+    await this.assertPlace(dto);
+    return this.store(dto, {
+      name: decodeOriginalName(upload.originalname),
+      mimeType: upload.mimetype || 'application/octet-stream',
+      buffer: upload.buffer,
+    });
+  }
+
+  /**
+   * «Забрать в хранилище» у внешней ссылки: сервер скачивает файл по адресу
+   * и кладёт к себе, как загруженный. Значение записи не меняет — номер
+   * нового файла вместо адреса ставит карточка, а сохраняют её как обычно.
+   */
+  async importUrl(dto: ImportFileDto): Promise<FileDto> {
+    await this.assertPlace(dto);
+    return this.store(dto, await fetchExternal(dto.url.trim(), MAX_FILE_SIZE));
+  }
+
+  /** Раздел или свойство — что-то одно, и оно должно быть: иначе файл лёг бы в никуда. */
+  private async assertPlace(dto: Pick<UploadFileDto, 'sectionId' | 'propertyId'>): Promise<void> {
     if ((dto.sectionId === undefined) === (dto.propertyId === undefined)) {
       throw new BadRequestException('Укажите раздел или свойство — что-то одно');
     }
-
-    // Раздел или свойство должны быть: иначе файл лёг бы в никуда
     if (dto.propertyId !== undefined) await this.sections.assertProperty(dto.propertyId);
     else await this.sections.getOwn(dto.sectionId as number);
+  }
 
-    const name = decodeOriginalName(upload.originalname);
-    const mimeType = upload.mimetype || 'application/octet-stream';
+  /** Строка файла и объект в хранилище; хранилище не приняло — строки тоже нет. */
+  private async store(
+    dto: Pick<UploadFileDto, 'sectionId' | 'propertyId'>,
+    { name, mimeType, buffer }: FetchedFile,
+  ): Promise<FileDto> {
     const { storageId, target } = await this.settings.uploadTarget();
 
     const file = await this.fileRepo.create({
@@ -121,7 +145,7 @@ export class FilesService {
       name,
       code: fileCode(name),
       mimeType,
-      size: upload.size,
+      size: buffer.length,
       storageId,
     });
 
@@ -131,7 +155,7 @@ export class FilesService {
       await this.storage.put(
         target,
         objectKeyOf(file.id, file.code),
-        upload.buffer,
+        buffer,
         mimeType,
         contentDisposition(mimeType, name),
       );

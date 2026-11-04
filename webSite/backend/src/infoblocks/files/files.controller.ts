@@ -26,6 +26,7 @@ import {
 } from '@nestjs/swagger';
 import { FileDto } from './dto/file.dto';
 import { FilesQueryDto } from './dto/files-query.dto';
+import { ImportFileDto } from './dto/import-file.dto';
 import { UpdateFileDto } from './dto/update-file.dto';
 import { UploadFileDto } from './dto/upload-file.dto';
 import { FilesService, MAX_FILE_SIZE } from './files.service';
@@ -66,6 +67,17 @@ export class FilesController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     return this.filesService.upload(dto, file);
+  }
+
+  @ApiOperation({ summary: 'Забрать внешний файл по адресу в хранилище — в раздел или в раздел свойства' })
+  @ApiOkResponse({ type: FileDto })
+  @ApiBadRequestResponse({
+    description: 'Адрес не http(s) или из внутренней сети, файл не скачался или больше 20 МБ, хранилище не приняло',
+  })
+  @ApiNotFoundResponse({ description: 'Раздел или свойство не найдены' })
+  @Post('import')
+  importUrl(@Body() dto: ImportFileDto) {
+    return this.filesService.importUrl(dto);
   }
 
   @ApiOperation({ summary: 'Поправить имя и описание файла' })

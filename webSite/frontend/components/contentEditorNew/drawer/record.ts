@@ -1,6 +1,6 @@
 import { linkKeyOf, linkOf, withId } from '../../../logic/contentLinks';
 import { domainValuesOf, type DomainValue } from '../../../logic/domains';
-import type { FileRules } from '../../../logic/files';
+import { fileItemsOf, type FileRules } from '../../../logic/files';
 import type { EditorRow } from '../table';
 import { tablePayload, tableRows } from './tableValue';
 
@@ -176,8 +176,13 @@ export const draftValueOf = (value: unknown, field: EditorField): unknown => {
       ? null
       : number;
   }
-  if (field.type === FieldType.List || isFileField(field)) {
-    // Вариант списка и файл держим номером: так они и уходят на сервер
+  if (isFileField(field)) {
+    // Файл — номером своего или адресом внешнего: так он и уходит на сервер
+    const items = fileItemsOf(value);
+    return field.isMultiple === true ? items : (items[0] ?? null);
+  }
+  if (field.type === FieldType.List) {
+    // Вариант списка держим номером: так он и уходит на сервер
     const ids = listOf(value).map(Number).filter((id) => Number.isInteger(id) && id > 0);
     return field.isMultiple === true ? ids : (ids[0] ?? null);
   }
@@ -202,7 +207,7 @@ export const draftValueOf = (value: unknown, field: EditorField): unknown => {
 /** То же поле, но с одним значением на все домены: им правят каждую строку домена. */
 export const singleOf = (field: EditorField): EditorField => ({ ...field, isMultiDomain: false });
 
-/** Поле выбирает файл: его значение — номер файла, а не текст. */
+/** Поле выбирает файл: его значение — номер файла или адрес внешнего, а не текст. */
 export const isFileField = (field: EditorField): boolean =>
   field.type === FieldType.File || field.type === FieldType.Image;
 

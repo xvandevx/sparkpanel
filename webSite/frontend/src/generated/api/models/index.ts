@@ -32,6 +32,7 @@ export * from './form-field-dto';
 export * from './history-clear-dto';
 export * from './history-page-dto';
 export * from './history-record-dto';
+export * from './import-file-dto';
 export * from './infoblock-column-dto';
 export * from './infoblock-property-dto';
 export * from './infoblock-settings-dto';

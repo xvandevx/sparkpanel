@@ -81,8 +81,10 @@ async function oneValue(property: WriteProperty, item: unknown, resolve: LinkRes
     }
     case PropertyType.File:
     case PropertyType.Image:
-      // Файл — номером; объект `File` из чтения тоже подходит
-      return isObject(item) && item.id !== undefined ? item.id : item;
+      // Свой файл — номером, внешний — адресом `https://…`. Объект `File`
+      // из чтения тоже подходит: у своего берётся номер, у внешнего — адрес
+      if (!isObject(item)) return item;
+      return item.id !== undefined && item.id !== null ? item.id : item.url;
     default:
       return item;
   }

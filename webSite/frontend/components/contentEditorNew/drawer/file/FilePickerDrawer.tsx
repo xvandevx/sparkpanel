@@ -13,8 +13,8 @@ import {
   useFiles,
   type FileDto,
   type FileRules,
-} from '../../../logic/files';
-import { FileThumb } from '../ui';
+} from '../../../../logic/files';
+import { FileThumb } from '../../ui';
 
 /** Что выбирают: настройки поля, из которого открыли выбор. */
 interface PickerOptions {
