@@ -52,7 +52,7 @@ export default function ColumnSettings({
     saved !== null &&
     JSON.stringify(view) !== JSON.stringify(viewOf(columnsDraft(available, saved)));
   const isEmpty = draft !== null && view.length === 0;
-  // Главная колонка тянется на свободное место — ширину ей не задают
+  // Главная колонка тянется на свободное место, её ширина — наименьшая
   const mainKey = mainColumnKey(
     view.map((item) => item.key),
     columns,
@@ -147,8 +147,9 @@ export default function ColumnSettings({
           <Typography.Text type="secondary">
             Отмеченные колонки видны в таблице — слева направо, в порядке этого списка.
             Пустая ширина — как задал раздел. Первая колонка после ID тянется на всё
-            свободное место — ширина ей не задаётся. Колонки настраиваются для вас:
-            у других пользователей таблица своя.
+            свободное место, а её ширина — наименьшая. Не помещаются колонки —
+            таблица прокручивается вбок. Колонки настраиваются для вас: у других
+            пользователей таблица своя.
           </Typography.Text>
 
           {isEmpty && <Alert type="warning" showIcon message="Отметьте хотя бы одну колонку" />}
@@ -197,13 +198,9 @@ export default function ColumnSettings({
                     min={40}
                     max={2000}
                     precision={0}
-                    disabled={!item.isShown || item.key === mainKey}
+                    disabled={!item.isShown}
                     placeholder={
-                      item.key === mainKey
-                        ? 'всё место'
-                        : item.defaultWidth
-                          ? String(item.defaultWidth)
-                          : 'авто'
+                      item.key === mainKey ? `от ${item.defaultWidth}` : String(item.defaultWidth)
                     }
                     style={{ width: '100%' }}
                     onChange={(width) => change(item.key, { width: typeof width === 'number' ? width : null })}

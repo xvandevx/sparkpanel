@@ -29,7 +29,7 @@ const SECTION_FIELDS: EditorFields = {
 };
 
 const SECTION_COLUMNS: EditorColumns = {
-  name: { name: 'Раздел', size: 360, isSort: true, isSearch: true },
+  name: { name: 'Раздел', size: 200, isSort: true, isSearch: true },
   filesCount: {
     name: 'Файлов',
     size: 120,

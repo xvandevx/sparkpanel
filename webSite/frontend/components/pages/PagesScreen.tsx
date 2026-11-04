@@ -44,7 +44,7 @@ const PAGE_FIELDS: EditorFields = {
  * не пора ли пересобрать вид таблицы.
  */
 const PAGE_COLUMNS: EditorColumns = {
-  name: { name: 'Название', size: 320, isSort: true, isSearch: true },
+  name: { name: 'Название', size: 200, isSort: true, isSearch: true },
   path: { name: 'Адрес', size: 260, isSort: true, isSearch: true },
   isActive: {
     name: 'Активность',

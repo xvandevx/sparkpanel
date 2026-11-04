@@ -34,7 +34,7 @@ const STORAGE_FIELDS: EditorFields = {
 };
 
 const STORAGE_COLUMNS: EditorColumns = {
-  name: { name: 'Хранилище', size: 240, isSort: true },
+  name: { name: 'Хранилище', size: 200, isSort: true },
   filesCount: { name: 'Файлов', size: 100 },
   isActive: standardColumns.isActive,
   sort: standardColumns.sort,

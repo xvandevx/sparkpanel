@@ -35,7 +35,7 @@ const DOMAIN_FIELDS: EditorFields = {
 };
 
 const DOMAIN_COLUMNS: EditorColumns = {
-  name: { name: 'Домен', size: 240, isSort: true, isSearch: true },
+  name: { name: 'Домен', size: 200, isSort: true, isSearch: true },
   address: { name: 'Адрес', size: 240, isSearch: true },
   isActive: standardColumns.isActive,
   sort: standardColumns.sort,

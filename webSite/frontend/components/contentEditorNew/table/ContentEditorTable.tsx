@@ -19,7 +19,14 @@ import { DraftTag, draftedRow } from '../drafts';
 import type { FilterEntry } from '../filters';
 import { effectiveSettings, type BlockedSettings } from '../settings';
 import { ActionIcon, FileThumb } from '../ui';
-import { cellText, ColumnSettings, ID_COLUMN_KEY, mainColumnKey, useColumns } from './columns';
+import {
+  cellText,
+  ColumnSettings,
+  ID_COLUMN_KEY,
+  mainColumnKey,
+  tableScrollWidth,
+  useColumns,
+} from './columns';
 import PropertyCell from './PropertyCell';
 import { useSearchFields } from './search';
 import { usePropertyCells } from './usePropertyCells';
@@ -157,8 +164,14 @@ export interface EditorColumn {
 export type EditorColumns = Record<string, EditorColumn>;
 
 /** Колонки по умолчанию: поля, которые есть у записи любого списка. */
+/**
+ * Колонка галочек antd (так она выходит в браузере) — её ширина нужна, чтобы
+ * посчитать ширину прокрутки.
+ */
+const SELECTION_WIDTH = 48;
+
 export const standardColumns: EditorColumns = {
-  name: { name: 'Название', size: 320, isSort: true, isSearch: true },
+  name: { name: 'Название', size: 200, isSort: true, isSearch: true },
   code: { name: 'Код', size: 240, isSearch: true },
   isActive: {
     name: 'Активность',
@@ -300,6 +313,9 @@ export default function ContentEditorTable({
     if (isChanged) setSelectedKeys([]);
   };
 
+  // Под каждый значок действия — 28 px
+  const actionsWidth = 80 + (recordPath === undefined ? 0 : 28) + (onPublish === undefined ? 0 : 28);
+
   if (page.error) return <Alert type="error" showIcon message={page.error} />;
 
   return (
@@ -313,6 +329,9 @@ export default function ContentEditorTable({
         // при раскладке «auto» antd подгоняет их под содержимое, и узкие колонки
         // (галочки, ID) у каждой таблицы выходили своей ширины
         tableLayout="fixed"
+        // Не помещаются колонки — таблица прокручивается вбок, а не сжимает их
+        // до буквы в строке. Шире экран — свободное место забирает главная колонка
+        scroll={{ x: tableScrollWidth(shown, actionsWidth + (isSelectable ? SELECTION_WIDTH : 0)) }}
         // Пока вид таблицы и фильтр не пришли, страницу не спрашиваем: колонки
         // ещё могут поменяться, а весь список мелькнул бы перед отобранным
         loading={page.isLoading}
@@ -321,7 +340,8 @@ export default function ContentEditorTable({
           ...shown.map(({ key, name, width, column, property }) => ({
             key,
             title: name,
-            // Главная колонка без ширины — она забирает свободное место
+            // Главная колонка без ширины — она забирает свободное место; её
+            // ширина — наименьшая, и она уже заложена в ширину прокрутки
             width: key === mainKey ? undefined : width,
             sorter: column?.isSort === true,
             sortOrder: column?.isSort === true ? sortOrderOf(key) : undefined,
@@ -386,8 +406,7 @@ export default function ContentEditorTable({
                 onClick={() => setIsColumnsOpen(true)}
               />
             ),
-            // Под каждый значок действия — 28 px
-            width: 80 + (recordPath === undefined ? 0 : 28) + (onPublish === undefined ? 0 : 28),
+            width: actionsWidth,
             // Действия прижаты к правому краю таблицы: так они стоят одной
             // линией и не плавают вслед за шириной остальных колонок
             align: 'right' as const,

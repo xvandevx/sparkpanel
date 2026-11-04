@@ -26,8 +26,8 @@ export type TableColumn = {
   key: string;
   /** Заголовок колонки */
   name: string;
-  /** Ширина, px; не задана — antd считает сам */
-  width?: number;
+  /** Ширина, px; у главной колонки — наименьшая, остальные держат её точно */
+  width: number;
 } & (
   | { column: EditorColumn; property?: undefined }
   | { property: EditorProperty; column?: undefined }
@@ -63,7 +63,14 @@ export const ID_COLUMN_KEY = 'id';
  * видна первой, но её, как и остальные, прячут, переставляют и меняют ей ширину
  * в «Колонках таблицы».
  */
-const ID_COLUMN: EditorColumn = { name: 'ID', size: 50, isSort: true };
+const ID_COLUMN: EditorColumn = { name: 'ID', size: 80, isSort: true };
+
+/**
+ * Ширина колонки, которой её не задали: свойства и колонки раздела без `size`.
+ * Без ширины колонку при нехватке места сжимало бы до буквы в строке —
+ * а так таблица не сжимается, а прокручивается вбок.
+ */
+export const DEFAULT_COLUMN_WIDTH = 160;
 
 /**
  * Даты записи — тоже колонки любой таблицы: `createdAt` и `updatedAt` сервер
@@ -79,10 +86,11 @@ const DATE_COLUMNS: EditorColumns = {
 
 /**
  * Главная колонка — первая видимая после номера, обычно название. В ней ветки
- * дерева и ссылка в запись, и она одна «резиновая»: забирает свободное место.
- * Остальные держат свою ширину точно — при раскладке `fixed` с шириной у всех
- * браузер раздал бы лишнее место всем поровну, и узкие колонки (галочки, ID)
- * расползались бы. Превью (`isPreview`) главной не бывает: квадрат на 72 px,
+ * дерева и ссылка в запись, и она одна «резиновая»: забирает свободное место,
+ * а её ширина — наименьшая: уже неё колонку не сожмёт, таблица прокрутится
+ * вбок (`tableScrollWidth`). Остальные держат свою ширину точно — при раскладке
+ * `fixed` с шириной у всех браузер раздал бы лишнее место всем поровну, и узкие
+ * колонки (галочки, ID) расползались бы. Превью (`isPreview`) главной не бывает: квадрат на 72 px,
  * растянутый на пол-экрана, — пустая колонка; главной тогда становится следующая.
  */
 export const mainColumnKey = (keys: string[], columns: EditorColumns): string | null =>
@@ -97,19 +105,28 @@ export const availableColumns = (
   columns: EditorColumns,
   properties: EditorProperty[],
 ): TableColumn[] => [
-  { key: ID_COLUMN_KEY, name: ID_COLUMN.name, width: ID_COLUMN.size, column: ID_COLUMN },
+  { key: ID_COLUMN_KEY, name: ID_COLUMN.name, width: ID_COLUMN.size ?? DEFAULT_COLUMN_WIDTH, column: ID_COLUMN },
   ...Object.entries({ ...columns, ...withoutKeys(DATE_COLUMNS, columns) }).map(([key, column]) => ({
     key,
     name: column.name,
-    width: column.size,
+    width: column.size ?? DEFAULT_COLUMN_WIDTH,
     column,
   })),
   ...properties.map((property) => ({
     key: propertyColumnKey(property.id),
     name: property.name,
+    width: DEFAULT_COLUMN_WIDTH,
     property,
   })),
 ];
+
+/**
+ * Ширина таблицы, уже которой она не сжимается, а прокручивается вбок: все
+ * колонки своей ширины, главная — наименьшей, плюс служебные (галочки,
+ * действия). Шире экран — свободное место забирает главная колонка.
+ */
+export const tableScrollWidth = (shown: TableColumn[], serviceWidth: number): number =>
+  shown.reduce((sum, item) => sum + item.width, serviceWidth);
 
 /** Колонки, ключей которых нет в `taken`. */
 const withoutKeys = (columns: EditorColumns, taken: EditorColumns): EditorColumns =>
@@ -142,7 +159,7 @@ export interface ColumnDraft {
   /** Своя ширина, px; null — как задал раздел */
   width: number | null;
   /** Ширина раздела — подсказкой в пустом поле */
-  defaultWidth?: number;
+  defaultWidth: number;
 }
 
 /**

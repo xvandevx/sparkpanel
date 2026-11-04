@@ -28,7 +28,7 @@ const ROLE_FIELDS: EditorFields = {
 };
 
 const ROLE_COLUMNS: EditorColumns = {
-  name: { name: 'Роль', size: 280, isSort: true, isSearch: true },
+  name: { name: 'Роль', size: 200, isSort: true, isSearch: true },
   isActive: standardColumns.isActive,
   sort: standardColumns.sort,
 };

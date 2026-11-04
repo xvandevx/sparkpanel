@@ -33,7 +33,7 @@ const FILE_FIELDS: EditorFields = {
 const FILE_COLUMNS: EditorColumns = {
   url: { name: '', size: 72, isPreview: true },
   // Имя открывает сам файл в новой вкладке — как в поле файла у карточки записи
-  name: { name: 'Файл', isSort: true, isSearch: true, linkField: 'url' },
+  name: { name: 'Файл', size: 200, isSort: true, isSearch: true, linkField: 'url' },
   links: {
     name: 'Привязан к',
     logic: (row) => fileLinks((row.links as FileLinkDto[] | undefined) ?? []),
