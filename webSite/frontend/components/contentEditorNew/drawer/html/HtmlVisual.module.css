@@ -8,6 +8,38 @@
   overflow: hidden;
 }
 
+/*
+ * На весь экран: рамка — во всю высоту окна, панель кнопок сверху, текст
+ * прокручивается под ней колонкой, которую удобно читать.
+ */
+.full {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.full > * {
+  flex: 1;
+  min-height: 0;
+}
+
+.full > .toolbar {
+  flex: none;
+}
+
+.full .content {
+  overflow-y: auto;
+}
+
+.full .content :global(.ProseMirror) {
+  box-sizing: border-box;
+  max-width: 860px;
+  min-height: 100%;
+  max-height: none;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
