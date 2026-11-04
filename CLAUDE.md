@@ -500,8 +500,9 @@ Swagger на `/api/docs`.
   мимо черновика). Списки MCP — `mcp-lists.ts`
   (пользователей, ролей, хранилищ и форм нет). Токены — `mcp_tokens`, журнал вызовов —
   `mcp_calls` (30 дней, всё, кроме полей отбора, — JSON `details`); root видит все, остальные —
-  свои (`/api/mcp/tokens`, `/api/mcp/calls`). Тело `/api/mcp` и `/api/v1` — до 25 МБ (`main.ts`: свой
-  JSON-парсер отменяет парсер Nest, поэтому общий там же поставлен явно).
+  свои (`/api/mcp/tokens`, `/api/mcp/calls`). Тело любого маршрута — до 25 МБ, как у nginx
+  (`main.ts`: MCP и внешнее API пишут маршрутами панели, предел у всех один; свой
+  JSON-парсер отменяет парсер Nest, поэтому он поставлен явно).
   Подробности — [`docs/mcp.md`](docs/mcp.md).
 - **Грабли JWT:** `JwtModule` подключается через `registerAsync` + `ConfigService`. Синхронный
   `register({ secret: process.env.PRIVATE_KEY })` не работает: метаданные `AuthModule`

@@ -39,8 +39,10 @@ interface PropertyValueCreationAttrs {
       unique: true,
       fields: ['recordId', 'propertyId', 'sort'],
     },
-    // По этим и пойдут фильтры с сортировкой по значению свойства
-    { name: 'infoblock_values_property_text', fields: ['propertyId', 'text'] },
+    // По этим и пойдут фильтры с сортировкой по значению свойства. У текста
+    // индекс — по началу строки, `left(text, 200)`: строка индекса Postgres
+    // не длиннее ~2,7 КБ, а HTML-статья — десятки килобайт. Он выражением,
+    // поэтому заводит его миграция (`0004-long-text-values`), а не модель
     { name: 'infoblock_values_property_number', fields: ['propertyId', 'number'] },
     { name: 'infoblock_values_property_option', fields: ['propertyId', 'optionId'] },
     // «Значения для домена» — поиском по массиву доменов
