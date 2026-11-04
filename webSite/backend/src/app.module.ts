@@ -85,10 +85,12 @@ const databaseConnection = () =>
     SequelizeModule.forRoot({
       dialect: 'postgres',
       ...databaseConnection(),
-      // Новую сущность добавлять сюда же. `sync` заводит только новые таблицы
-      // (`alter: false`): правку существующей — колонку, индекс, перенос
-      // данных — пишут миграцией в `src/migrations/`. `alter: true` молча
-      // удалял колонки вместе с данными, на чужой установке это потеря данных
+      // Новую сущность добавлять сюда же. Схему при старте приводит
+      // `MigrationsService`, а не этот модуль (`synchronize: false`): новые
+      // таблицы, потом миграции, потом индексы моделей. Правку существующей
+      // таблицы — колонку, индекс, перенос данных — пишут миграцией
+      // в `src/migrations/`. `alter: true` не включаем: он молча удалял
+      // колонки вместе с данными, на чужой установке это потеря данных
       models: [
         Users,
         Pages,
@@ -122,8 +124,7 @@ const databaseConnection = () =>
         SchemaMigration,
       ],
       autoLoadModels: true,
-      synchronize: true,
-      sync: { alter: false },
+      synchronize: false,
     }),
     UsersModule,
     AuthModule,
