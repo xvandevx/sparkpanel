@@ -1,11 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import { StorageKind, StorageTarget } from '../storage/storage.service';
+import { BrandDto } from './dto/brand.dto';
 import { SettingsDto } from './dto/settings.dto';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { SETTINGS_KEYS, SettingsValues, settingsFrom, storageIdOf } from './settings-values';
 import { Settings } from './settings.model';
+import { Logo, logoProblem, logoVersion, parseLogo } from './logo';
 import { StoragesService } from '../infoblocks/storages/storages.service';
 
 /**
@@ -24,10 +26,23 @@ export class SettingsService {
     return SettingsDto.from(await this.values());
   }
 
+  /** Название и адрес логотипа — то, чем подписана панель ещё до входа. */
+  async brand(): Promise<BrandDto> {
+    return BrandDto.from(await this.values());
+  }
+
+  /** Картинка логотипа и её версия; своего логотипа нет — null. */
+  async logo(): Promise<(Logo & { version: string }) | null> {
+    const { logo } = await this.values();
+    const parsed = logo ? parseLogo(logo) : null;
+    return parsed ? { ...parsed, version: logoVersion(logo) } : null;
+  }
+
   /**
    * Сохранение изменённого. Выбрали для новых файлов внешнее хранилище —
    * сначала проверяем, что оно есть и отвечает: иначе о неверном ключе узнали
-   * бы на первой загрузке, из карточки записи.
+   * бы на первой загрузке, из карточки записи. Логотип — картинка нужного
+   * типа и веса, иначе 400.
    */
   async update(dto: UpdateSettingsDto): Promise<SettingsDto> {
     const before = await this.values();
@@ -36,7 +51,12 @@ export class SettingsService {
       // `null` — встроенное, его значение — пустая строка
       storageId:
         dto.storageId === undefined ? before.storageId : dto.storageId === null ? '' : String(dto.storageId),
+      // `null` — вернуть логотип SparkPanel, его значение — пустая строка
+      logo: dto.logo === undefined ? before.logo : dto.logo ?? '',
     };
+
+    const problem = next.logo && next.logo !== before.logo ? logoProblem(next.logo) : null;
+    if (problem) throw new BadRequestException(problem);
 
     const storageId = storageIdOf(next.storageId);
     if (storageId !== null && next.storageId !== before.storageId) {

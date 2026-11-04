@@ -2,7 +2,11 @@ import { useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../../redux';
 import { loadEditorListThunk } from '../../redux/action-creaters/contentEditorNew';
-import { loadSettingsThunk, saveSettingsThunk } from '../../redux/action-creaters/settings';
+import {
+  loadBrandThunk,
+  loadSettingsThunk,
+  saveSettingsThunk,
+} from '../../redux/action-creaters/settings';
 import type { UpdateSettingsDto } from '../../src/api/client';
 import { ListKey } from '../listSettings';
 import { storagesApi } from './storagesApi';
@@ -22,7 +26,8 @@ export function useSettings() {
 /**
  * Сохранение изменённого; возвращает текст ошибки или null. Сменили хранилище
  * для новых файлов — список хранилищ перечитывается: выбранное нельзя удалить,
- * и замок в его строке должен переехать вслед за выбором.
+ * и замок в его строке должен переехать вслед за выбором. Сменили название
+ * или логотип — перечитывается и подпись панели в меню.
  */
 export function useSettingsActions() {
   const dispatch = useDispatch<AppDispatch>();
@@ -31,6 +36,9 @@ export function useSettingsActions() {
       const error = await dispatch(saveSettingsThunk(changes));
       if (error === null && changes.storageId !== undefined) {
         dispatch(loadEditorListThunk(ListKey.storages, storagesApi.list));
+      }
+      if (error === null && (changes.logo !== undefined || changes.siteName !== undefined)) {
+        dispatch(loadBrandThunk());
       }
       return error;
     },

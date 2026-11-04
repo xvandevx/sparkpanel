@@ -5,7 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # aiAdmin — правила работы с кодом
 
 Приложение называется **SparkPanel** (раньше CoPanel; репозиторий и рабочая папка остались `aiAdmin`).
-Логотип в SVG — [`brand/`](brand/): знак, вертикальный и горизонтальный варианты.
+Логотип в SVG — [`brand/`](brand/): знак, вертикальный и горизонтальный варианты; в панели
+его рисует `components/ui/BrandMark.tsx`. Тот, кто ставит панель, может заменить его своим
+в «Настройках сайта» (ключ `logo`, [`docs/settings.md`](docs/settings.md)).
 
 Проект — **админ-панель**. Инфраструктура, архитектурные правила и инструменты Claude Code
 портированы из проекта `focuzy`; **код и реализация — свои**, ничего из focuzy не копируем.
@@ -304,8 +306,11 @@ Swagger на `/api/docs`.
   Подробности — [`docs/pages.md`](docs/pages.md).
 - **Настройки сайта:** модуль `settings/` — **строка на настройку** (`key` + `value`),
   без владельца: настройки общие на весь сайт, ключи и значения по умолчанию —
-  `settings-values.ts` (`GET`/`PATCH /api/settings`): название сайта и `storageId` —
-  хранилище для новых файлов (пусто — встроенное). Внешние хранилища — список редактора, поэтому
+  `settings-values.ts` (`GET`/`PATCH /api/settings`): название сайта, `storageId` —
+  хранилище для новых файлов (пусто — встроенное) и `logo` — логотип панели вместо
+  SparkPanel, картинкой data URI прямо в строке (не в хранилище: копия сайта без файлов),
+  `settings/logo.ts`. Логотип виден до входа, поэтому `GET /api/settings/brand`
+  (название и `logoUrl`) и `GET /api/settings/logo` (картинка) — `@Public()`. Внешние хранилища — список редактора, поэтому
   модуль `infoblocks/storages/` (`infoblock_storages`, `/api/infoblocks/storages`),
   сколько угодно, тоже без владельца (список `isShared`). Своё у хранилища — название,
   активность, сортировка; подключение (адрес, бакет, ключи) — системные свойства списка,
@@ -631,8 +636,10 @@ pages/ → components/ → logic/ → redux/ → api/ → src/generated/
   «Домены» (`/admin/settings/domains`), «API» и «MCP» (ниже) и «Резервные копии» (`/admin/settings/backups`,
   `components/settings/backups/` + `logic/siteBackups/`; пункт только у root —
   `isRootOnly` у подпункта в `config/navigation.ts`).
-  «Настройки сайта» — вкладка «Общие»: название сайта и выбор хранилища для новых
-  файлов (рядом кнопка-переход на «Хранилища»); уходит только изменённое. Внешние хранилища —
+  «Настройки сайта» — вкладка «Общие»: название сайта, выбор хранилища для новых
+  файлов (рядом кнопка-переход на «Хранилища») и логотип панели; уходит только
+  изменённое. Логотип в меню и на экране входа — `BrandMark` с `logoUrl` из `useBrand`
+  (`state.settings.brand`, публичный `/api/settings/brand`); своего нет — SparkPanel. Внешние хранилища —
   список на новом редакторе контента своим экраном (`StoragesScreen`), домены —
   дерево на нём же, тоже своим экраном (`DomainsScreen`). Подробности — [`docs/settings.md`](docs/settings.md),
   [`docs/domains.md`](docs/domains.md). «Резервные копии» — копии всей базы: создать,

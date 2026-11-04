@@ -1,8 +1,9 @@
 import type { Dispatch } from 'redux';
-import { fetchSettings, saveSettings } from '../../api/settings';
+import { fetchBrand, fetchSettings, saveSettings } from '../../api/settings';
 import type { UpdateSettingsDto } from '../../src/api/client';
 import { apiErrorMessage } from '../apiError';
 import {
+  BRAND_SUCCESS,
   SETTINGS_ERROR,
   SETTINGS_REQUEST,
   SETTINGS_SUCCESS,
@@ -35,5 +36,19 @@ export const saveSettingsThunk =
       return null;
     } catch (error) {
       return apiErrorMessage(error, 'Не удалось сохранить настройки');
+    }
+  };
+
+/**
+ * Название и логотип панели. Не ответил сервер — подписываемся SparkPanel:
+ * экран входа без логотипа хуже, чем со стандартным.
+ */
+export const loadBrandThunk =
+  () =>
+  async (dispatch: Dispatch<SettingsAction>): Promise<void> => {
+    try {
+      dispatch({ type: BRAND_SUCCESS, payload: await fetchBrand() });
+    } catch {
+      dispatch({ type: BRAND_SUCCESS, payload: { siteName: '', logoUrl: '' } });
     }
   };

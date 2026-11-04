@@ -1,5 +1,6 @@
 import { Card, Typography } from 'antd';
 import { useLogin } from '../../logic/auth';
+import { useBrand } from '../../logic/settings';
 import { BrandMark, VantaHalo } from '../ui';
 import LoginForm from './LoginForm';
 import RootSetup from './RootSetup';
@@ -12,6 +13,7 @@ const headings = {
 /** Экран доступа: первичная настройка либо вход. Что показывать — решает useLogin. */
 export default function AdminAuthScreen() {
   const { needsRoot } = useLogin();
+  const { logoUrl, siteName, isLoaded } = useBrand();
   const { title, subtitle } = needsRoot ? headings.setup : headings.login;
 
   return (
@@ -21,7 +23,10 @@ export default function AdminAuthScreen() {
       {/* relative z-10 — чтобы карточка оказалась над fixed-подложкой фона */}
       <div className="relative z-10 flex min-h-screen items-center justify-center p-6">
         <div className="flex w-full max-w-md flex-col items-center gap-8">
-          <BrandMark />
+          {/* Место под логотип есть и до ответа: карточка не съезжает, когда он придёт */}
+          <div style={{ minHeight: 36 }}>
+            {isLoaded && <BrandMark logoUrl={logoUrl} logoAlt={siteName} />}
+          </div>
 
           <Card
             style={{ width: '100%' }}

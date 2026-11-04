@@ -4,6 +4,10 @@ import { useId } from 'react';
 interface BrandMarkProps {
   /** Показать название рядом со значком */
   withWordmark?: boolean;
+  /** Свой логотип из настроек сайта вместо SparkPanel; пусто — SparkPanel */
+  logoUrl?: string;
+  /** Подпись своего логотипа для читалок экрана — название сайта */
+  logoAlt?: string;
   className?: string;
 }
 
@@ -11,10 +15,30 @@ interface BrandMarkProps {
  * Логотип SparkPanel: искра и название. Рисуется на тёмном фоне (левое меню,
  * экран входа), поэтому «Spark» белым, «Panel» светло-серым. Исходник знака —
  * `brand/sparkpanel-mark.svg` в корне репозитория.
+ *
+ * Свой логотип (`logoUrl`) рисуется картинкой той же высоты, что знак, —
+ * целиком, без названия рядом: название обычно уже в нём.
  */
-export default function BrandMark({ withWordmark = true, className }: BrandMarkProps) {
+export default function BrandMark({
+  withWordmark = true,
+  logoUrl,
+  logoAlt,
+  className,
+}: BrandMarkProps) {
   // У градиента свой id на каждый логотип: на странице их бывает два
   const gradientId = useId();
+
+  if (logoUrl) {
+    return (
+      <div className={clsx('flex items-center', className)}>
+        <img
+          src={logoUrl}
+          alt={logoAlt || 'Логотип'}
+          style={{ height: 36, width: 'auto', maxWidth: '100%', objectFit: 'contain' }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={clsx('flex items-center gap-3', className)}>

@@ -32,5 +32,11 @@ export interface UpdateSettingsDto {
      * @memberof UpdateSettingsDto
      */
     'storageId'?: number | null;
+    /**
+     * Логотип панели картинкой data URI: PNG, JPEG, WebP, GIF или SVG до 512 КБ; null — вернуть логотип SparkPanel
+     * @type {string}
+     * @memberof UpdateSettingsDto
+     */
+    'logo'?: string | null;
 }
 

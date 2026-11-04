@@ -38,6 +38,7 @@ docs/AuthApi.md
 docs/BackupCheckDto.md
 docs/BackupCountsDto.md
 docs/BackupDto.md
+docs/BrandDto.md
 docs/ContentDto.md
 docs/ContentItemDto.md
 docs/ContentItemsApi.md
@@ -158,6 +159,7 @@ models/api-list-dto.ts
 models/backup-check-dto.ts
 models/backup-counts-dto.ts
 models/backup-dto.ts
+models/brand-dto.ts
 models/content-dto.ts
 models/content-item-dto.ts
 models/create-api-key-dto.ts

@@ -3,6 +3,7 @@ export * from './api-list-dto';
 export * from './backup-check-dto';
 export * from './backup-counts-dto';
 export * from './backup-dto';
+export * from './brand-dto';
 export * from './content-dto';
 export * from './content-item-dto';
 export * from './create-api-key-dto';

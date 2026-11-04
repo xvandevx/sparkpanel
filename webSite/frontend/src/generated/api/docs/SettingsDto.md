@@ -7,6 +7,7 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **siteName** | **string** | Название сайта | [default to undefined]
 **storageId** | **number** | Хранилище для новых файлов; null — встроенное | [default to undefined]
+**logoUrl** | **string** | Адрес логотипа панели; пусто — логотип SparkPanel | [default to undefined]
 
 ## Example
 
@@ -16,6 +17,7 @@ import { SettingsDto } from './api';
 const instance: SettingsDto = {
     siteName,
     storageId,
+    logoUrl,
 };
 ```
 

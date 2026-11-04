@@ -32,5 +32,11 @@ export interface SettingsDto {
      * @memberof SettingsDto
      */
     'storageId': number | null;
+    /**
+     * Адрес логотипа панели; пусто — логотип SparkPanel
+     * @type {string}
+     * @memberof SettingsDto
+     */
+    'logoUrl': string;
 }
 

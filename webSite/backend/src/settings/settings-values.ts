@@ -10,6 +10,11 @@ export const SETTINGS_DEFAULTS = {
    * пусто — встроенное. Сами хранилища — своя таблица, здесь только выбор.
    */
   storageId: '',
+  /**
+   * Логотип панели вместо SparkPanel — картинка data URI (`logo.ts`),
+   * пусто — логотип SparkPanel. Наружу отдаётся не он, а адрес картинки.
+   */
+  logo: '',
 };
 
 export type SettingsValues = typeof SETTINGS_DEFAULTS;

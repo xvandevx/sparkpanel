@@ -2,6 +2,7 @@ import { createElement, useMemo, useState } from 'react';
 import { Layout, Menu } from 'antd';
 import type { MenuProps } from 'antd';
 import { useNavigation, type NavItem } from '../../../logic/navigation';
+import { useBrand } from '../../../logic/settings';
 import { BrandMark } from '../../ui';
 import SidebarUser from './SidebarUser';
 
@@ -15,6 +16,7 @@ interface SidebarProps {
 /** Левое меню: логотип, разделы системы и учётная запись внизу. */
 export default function Sidebar({ collapsed, onCollapse }: SidebarProps) {
   const { items, activeKey, openKeys, navigate } = useNavigation();
+  const { logoUrl, siteName, isLoaded } = useBrand();
 
   /** Подменю, раскрытые руками. То, внутри которого мы находимся, открыто всегда. */
   const [manualOpen, setManualOpen] = useState<string[]>([]);
@@ -40,8 +42,9 @@ export default function Sidebar({ collapsed, onCollapse }: SidebarProps) {
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <div style={{ padding: collapsed ? '18px 12px' : '18px 20px' }}>
-          <BrandMark withWordmark={!collapsed} />
+        {/* Высота знака держится и до ответа: меню не прыгает, когда логотип придёт */}
+        <div style={{ padding: collapsed ? '18px 12px' : '18px 20px', minHeight: 72 }}>
+          {isLoaded && <BrandMark withWordmark={!collapsed} logoUrl={logoUrl} logoAlt={siteName} />}
         </div>
 
         <Menu
