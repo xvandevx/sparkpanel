@@ -57,11 +57,19 @@ export interface PageQuery {
   filters: RecordFilter[];
 }
 
-/** Свойство записи — то, что о нём нужно фильтру. */
+/**
+ * Свойство записи — то, что о нём нужно фильтру. Множественность и список
+ * привязки нужны отбору в базе (`records-sql.ts`): из строк значений он сам
+ * берёт первое у одиночного и только ссылки своего списка у привязки — то,
+ * что здесь уже сделало чтение значений.
+ */
 export interface PageProperty {
   id: number;
   type: string;
   isMultiDomain?: boolean;
+  multiple?: boolean;
+  /** Откуда записи привязки: у привязки к типу контента — типы */
+  linkList?: string;
 }
 
 /** Значения свойств: ключ записи → номер свойства → значение. */
@@ -252,6 +260,56 @@ function fieldItems(
     Array.isArray(value) ? value : value === null || value === undefined || value === '' ? [] : [value],
   );
   return property.type === PropertyType.Html ? items.map((item) => htmlText(String(item))) : items;
+}
+
+/**
+ * Значение мультидоменного свойства для домена: уникальное значение домена
+ * сильнее общего; общее не действует на домены из «кроме». Без домена —
+ * общее значение. Так видит значения сайт — внешнее API.
+ */
+export function domainValue(stored: unknown, domainId: number | null): unknown {
+  if (!Array.isArray(stored)) return stored ?? null;
+  const groups = stored as { domainIds: number[] | null; exceptDomainIds?: number[]; value: unknown }[];
+  if (domainId !== null) {
+    const own = groups.find((group) => group.domainIds !== null && group.domainIds.includes(domainId));
+    if (own) return own.value;
+  }
+  const common = groups.find((group) => group.domainIds === null);
+  if (!common) return null;
+  if (domainId !== null && (common.exceptDomainIds ?? []).includes(domainId)) return null;
+  return common.value;
+}
+
+/**
+ * Что лежит в значениях свойства у отобранных записей — для фасета:
+ * ключ значения (номер варианта, `список/запись` привязки) → сколько раз,
+ * у чисел — границы. Считает и база (`records-sql.ts`), и память (`tallyOf`).
+ */
+export interface ValueTally {
+  counts: Map<string, number>;
+  min: number | null;
+  max: number | null;
+}
+
+/** Подсчёт значений свойства в памяти: у записей `rows` по их значениям `values`. */
+export function tallyOf(property: PageProperty, rows: PageRow[], values: RecordValues): ValueTally {
+  const tally: ValueTally = { counts: new Map(), min: null, max: null };
+  for (const row of rows) {
+    const stored = values.get(String(row.id))?.get(property.id);
+    const items = Array.isArray(stored) ? stored : stored === null || stored === undefined || stored === '' ? [] : [stored];
+    for (const item of items) {
+      if (property.type === PropertyType.Number) {
+        const number = Number(item);
+        if (!Number.isFinite(number)) continue;
+        tally.min = tally.min === null ? number : Math.min(tally.min, number);
+        tally.max = tally.max === null ? number : Math.max(tally.max, number);
+        continue;
+      }
+      const key = optionValueOf(item);
+      tally.counts.set(key, (tally.counts.get(key) ?? 0) + 1);
+    }
+  }
+  return tally;
 }
 
 /** Значения мультидоменного свойства: общее и уникальные — без разбора, чьи. */

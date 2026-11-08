@@ -60,6 +60,16 @@ export class ProductCategoriesService {
     );
   }
 
+  /**
+   * Категории из строк таблицы — с отметкой «привязана» (`isBlocked`): таблице
+   * админки, которая читает страницу записей запросом, а не `findAll`.
+   */
+  async fromRows(rows: ProductCategories[]): Promise<ProductCategoryDto[]> {
+    if (rows.length === 0) return [];
+    const linked = await this.linkedIds();
+    return rows.map((category) => ProductCategoryDto.from(category, linked.has(String(category.id))));
+  }
+
   async create(
     userId: number,
     dto: CreateProductCategoryDto,

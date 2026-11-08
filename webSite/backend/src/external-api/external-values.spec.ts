@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { FilterKind, type RecordValues } from '../infoblocks/records/records-page';
+import { FilterKind, tallyOf, type RecordValues } from '../infoblocks/records/records-page';
 import { PropertyType } from '../infoblocks/settings/properties/property';
 import {
   apiValue,
@@ -154,12 +154,6 @@ describe('parseApiFilters', () => {
   it('привязка — номера записей в ключи «список/запись»', () =>
     expect(parseApiFilters({ categories: ['3', '4'] }, properties)[0].filter).toMatchObject({ codes: ['product-categories/3', 'product-categories/4'] }));
 
-  it('у привязки — ещё и номера записей для отбора в базе, у остальных их нет', () => {
-    const [categories, brand] = parseApiFilters({ categories: '3, 4', brand: 'bosch' }, properties);
-    expect(categories.linkIds).toEqual(['3', '4']);
-    expect(brand.linkIds).toBeUndefined();
-  });
-
   it('неизвестное свойство и нефильтруемый тип — 400', () => {
     expect(() => parseApiFilters({ nope: '1' }, properties)).toThrow(BadRequestException);
     expect(() => parseApiFilters({ photo: '1' }, properties)).toThrow(BadRequestException);
@@ -176,7 +170,7 @@ describe('facetOf', () => {
   ]);
 
   it('«Список» — каждый вариант со счётчиком', () =>
-    expect(facetOf(brand, rows, values, new Map())).toEqual({
+    expect(facetOf(brand, tallyOf(brand, rows, values), new Map())).toEqual({
       type: 'list',
       values: [
         { value: 'bosch', label: 'Bosch', count: 2 },
@@ -184,5 +178,21 @@ describe('facetOf', () => {
       ],
     }));
 
-  it('число — min и max', () => expect(facetOf(price, rows, values, new Map())).toEqual({ type: 'number', min: 1990, max: 48900 }));
+  it('число — min и max', () => expect(facetOf(price, tallyOf(price, rows, values), new Map())).toEqual({ type: 'number', min: 1990, max: 48900 }));
+
+  it('привязка — записи по убыванию счётчика, равные — по номеру, с названиями', () => {
+    const linked: RecordValues = new Map([
+      ['1', new Map<number, unknown>([[6, [{ listKey: 'product-categories', recordId: '9' }, { listKey: 'product-categories', recordId: '3' }]]])],
+      ['2', new Map<number, unknown>([[6, [{ listKey: 'product-categories', recordId: '3' }]]])],
+      ['3', new Map<number, unknown>([[6, [{ listKey: 'product-categories', recordId: '5' }]]])],
+    ]);
+    expect(facetOf(categories, tallyOf(categories, rows, linked), context.linkNames)).toEqual({
+      type: 'content-link',
+      values: [
+        { list: 'product-categories', id: 3, name: 'Фаркопы', count: 2 },
+        { list: 'product-categories', id: 5, name: null, count: 1 },
+        { list: 'product-categories', id: 9, name: null, count: 1 },
+      ],
+    });
+  });
 });

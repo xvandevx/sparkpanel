@@ -3,10 +3,9 @@ import { CONTENTS_LIST, contentItemsList } from '../infoblocks/contents/content-
 import { ContentsService } from '../infoblocks/contents/contents.service';
 import type { ContentDto } from '../infoblocks/contents/dto/content.dto';
 import { DomainsService } from '../infoblocks/domains/domains.service';
-import { DraftsService } from '../infoblocks/drafts/drafts.service';
 import { FilesService } from '../infoblocks/files/files.service';
-import { PAGE_SIZES, pageRecords, type PageRow, type RecordValues } from '../infoblocks/records/records-page';
-import { RecordsService } from '../infoblocks/records/records.service';
+import { PAGE_SIZES, type PageProperty, type PageRow, type RecordValues } from '../infoblocks/records/records-page';
+import { RecordsService, type Selection } from '../infoblocks/records/records.service';
 import { isLinkType, linkKey, PropertyType, type ContentLink } from '../infoblocks/settings/properties/property';
 import { InfoblockSettingsService } from '../infoblocks/settings/settings.service';
 import { PropertyValuesService } from '../infoblocks/values/property-values.service';
@@ -20,6 +19,7 @@ import {
   facetOf,
   itemsOf,
   linkListOf,
+  linkOfKey,
   parseApiFilters,
   parseExpand,
   type ApiFacet,
@@ -31,14 +31,12 @@ import {
 import { buildSpec, sortKeys } from './openapi-spec';
 
 /**
- * Записи списка, как их видит API: опубликованные, свойства — отдаваемые.
- * Значений здесь нет: их читают по надобности (`valuesOf`) — на отбор
- * свойства фильтра, на ответ — записи страницы. Все значения списка разом —
- * это секунды на тысячах товаров.
+ * Список, как его видит API: свойства — отдаваемые, домен запроса. Записей
+ * здесь нет: их отбирает `RecordsService` (у больших списков — запросом
+ * к базе), значения читаются только у показываемых записей (`valuesOf`).
  */
 interface Loaded {
   list: ApiList;
-  rows: PageRow[];
   properties: ApiPropertyDef[];
   /** Домен запроса: значения мультидоменных свойств и раскрытые привязки — для него */
   domain: string | undefined;
@@ -56,19 +54,15 @@ const apiContentType = (type: ContentDto) => ({
   total: type.itemsCount,
 });
 
-/**
- * Свойства для общего отбора. Мультидоменных среди них нет: значения уже
- * взяты для одного домена (`apiValues`).
- */
-const pageProperties = (properties: ApiPropertyDef[]) =>
-  properties.map((property) => ({ id: property.id, type: property.type, isMultiDomain: false }));
-
-/** Ключ сортировки по свойству: в строку записи кладётся его значение. */
-const SORT_VALUE = '$sort';
-
-/** Свойства, по которым отбирают: их значения нужны отбору. */
-const filteredBy = (properties: ApiPropertyDef[], filters: ApiFilter[]): ApiPropertyDef[] =>
-  properties.filter((property) => filters.some((item) => item.propertyId === property.id));
+/** Свойства для общего отбора: мультидоменные значения отбор берёт для домена запроса сам. */
+const pageProperties = (properties: ApiPropertyDef[]): PageProperty[] =>
+  properties.map((property) => ({
+    id: property.id,
+    type: property.type,
+    isMultiDomain: property.isMultiDomain,
+    multiple: property.multiple,
+    linkList: linkListOf(property),
+  }));
 
 /** Привязки записей в значениях свойств — для названий привязанных записей. */
 const linksOf = (rows: PageRow[], linkProps: ApiPropertyDef[], values: RecordValues): ContentLink[] =>
@@ -77,19 +71,10 @@ const linksOf = (rows: PageRow[], linkProps: ApiPropertyDef[], values: RecordVal
   );
 
 /**
- * Отобранные по привязкам в базе (`linkMatches`): записи, которые есть в наборе
- * каждого фильтра-привязки, кроме фильтра свойства `except` — его фасет свой
- * выбор не учитывает.
- */
-const withLinks = (rows: PageRow[], matches: Map<number, Set<string>>, except: number | null = null): PageRow[] => {
-  const sets = Array.from(matches).flatMap(([propertyId, set]) => (propertyId === except ? [] : [set]));
-  return sets.length === 0 ? rows : rows.filter((row) => sets.every((set) => set.has(String(row.id))));
-};
-
-/**
  * Внешнее API, чтение: читает списки панели теми же сервисами, что и редактор
- * (записи — у `RecordsService`, свойства — у настроек, значения — у `values/`),
- * отбирает общим `pageRecords` и отдаёт в виде для сайта. Данные сайта
+ * (записи — у `RecordsService`, свойства — у настроек, значения — у `values/`):
+ * отбор, страница и фасеты — у `RecordsService`, по тем же правилам, что
+ * таблица админки, а здесь — вид для сайта. Данные сайта
  * общие — ключ читает их все, чей бы он ни был. Запись — `write/`.
  */
 @Injectable()
@@ -98,7 +83,6 @@ export class ExternalApiService {
     private readonly records: RecordsService,
     private readonly settings: InfoblockSettingsService,
     private readonly values: PropertyValuesService,
-    private readonly drafts: DraftsService,
     private readonly contents: ContentsService,
     private readonly domains: DomainsService,
     private readonly files: FilesService,
@@ -125,41 +109,22 @@ export class ExternalApiService {
     const filters = parseApiFilters(query.filter, properties);
     const expand = await this.expandOf(query.expand, properties);
 
-    let rows = loaded.rows;
-    if (query.parentId !== undefined && list.fields.includes('parentId')) {
-      const parent = query.parentId === 'root' ? null : query.parentId;
-      rows = rows.filter((row) => (row.parentId ?? null) === null ? parent === null : String(row.parentId) === parent);
-    }
-
     const sort = query.sort ?? 'sort';
     if (!sortKeys({ list, properties }).includes(sort)) throw new BadRequestException(`По «${sort}» не сортируют`);
     const property = properties.find((item) => item.code === sort);
 
-    // Сначала — привязки, запросом к базе; значения отбору нужны только
-    // у оставшихся записей и только свойств фильтра и сортировки
-    rows = withLinks(rows, await this.linkMatches(loaded, filters));
-    const values = await this.valuesOf(loaded, rows, [...filteredBy(properties, filters), ...(property ? [property] : [])]);
-    if (property) {
-      rows = rows.map((row) => ({ ...row, [SORT_VALUE]: values.get(String(row.id))?.get(property.id) ?? null }));
-    }
-
     const pageSize = query.pageSize ?? PAGE_SIZES[0];
     const page = query.page ?? 1;
-    const found = pageRecords(
-      rows,
-      {
-        page,
-        pageSize,
-        search: query.search ?? '',
-        searchIn: list.searchIn,
-        sort: property ? SORT_VALUE : sort,
-        isDescending: query.order === 'desc',
-        isTree: false,
-        filters: filters.map((item) => item.filter),
-      },
-      pageProperties(properties),
-      values,
-    );
+    const found = await this.records.select(list.listKey, {
+      ...this.selectionOf(loaded, query.search, filters),
+      page,
+      pageSize,
+      sort: property ? { propertyId: property.id } : { field: sort },
+      isDescending: query.order === 'desc',
+      ...(query.parentId !== undefined && list.fields.includes('parentId')
+        ? { parentId: query.parentId === 'root' ? null : query.parentId }
+        : {}),
+    });
     const shown = await this.valuesOf(loaded, found.items, properties);
     const context = await this.contextOf(loaded, found.items, shown, origin, expand);
     return {
@@ -173,7 +138,7 @@ export class ExternalApiService {
   async item(path: string, idOrCode: string, query: ExternalItemQueryDto, origin: string) {
     const loaded = await this.load(await this.listAt(path), query.domain);
     const expand = await this.expandOf(query.expand, loaded.properties);
-    const row = loaded.rows.find((item) => String(item.id) === idOrCode || (item.code !== '' && item.code === idOrCode));
+    const [row] = await this.records.find(loaded.list.listKey, { idOrCode }, true);
     return this.one(loaded, row, origin, expand);
   }
 
@@ -184,20 +149,23 @@ export class ExternalApiService {
     if (recordId === null) throw new NotFoundException('Запись не найдена');
     const loaded = await this.load(list, query.domain);
     const expand = await this.expandOf(query.expand, loaded.properties);
-    return this.one(loaded, loaded.rows.find((row) => String(row.id) === recordId), origin, expand);
+    const [row] = await this.records.find(list.listKey, { ids: [recordId] }, true);
+    return this.one(loaded, row, origin, expand);
   }
 
   /** Страница по полному адресу — то, что нужно роутеру сайта. Слэш в конце не важен. */
   async pageByUrl(url: string, domain: string | undefined, origin: string) {
     const loaded = await this.load(PAGES_API, domain);
     const wanted = trimSlash(url);
-    return this.one(loaded, loaded.rows.find((row) => trimSlash(String(row.path ?? '')) === wanted), origin);
+    const rows = await this.records.siteRows(PAGES_API.listKey);
+    return this.one(loaded, rows.find((row) => trimSlash(String(row.path ?? '')) === wanted), origin);
   }
 
   async domainByHost(host: string, origin: string) {
     const loaded = await this.load(DOMAINS_API, undefined);
     const wanted = host.trim().toLowerCase();
-    return this.one(loaded, loaded.rows.find((row) => row.address === wanted), origin);
+    const rows = await this.records.siteRows(DOMAINS_API.listKey);
+    return this.one(loaded, rows.find((row) => row.address === wanted), origin);
   }
 
   async properties(path: string) {
@@ -225,41 +193,50 @@ export class ExternalApiService {
     const { list, properties } = loaded;
     const filters = parseApiFilters(query.filter, properties);
     const facetProps = properties.filter((property) => FACET_TYPES.has(property.type));
-    const linkProps = facetProps.filter((item) => isLinkType(item.type));
-    const matches = await this.linkMatches(loaded, filters);
+    // Фасеты свойств, по которым не отбирают, — по одним и тем же записям,
+    // одним подсчётом; у свойства фильтра — свой, без его поля
+    const isFiltered = (property: ApiPropertyDef) => filters.some((item) => item.propertyId === property.id);
+    const tallies = await Promise.all([
+      this.records.tallies(
+        list.listKey,
+        this.selectionOf(loaded, query.search, filters),
+        pageProperties(facetProps.filter((property) => !isFiltered(property))),
+      ),
+      ...facetProps.filter(isFiltered).map((property) =>
+        this.records.tallies(
+          list.listKey,
+          this.selectionOf(loaded, query.search, filters.filter((item) => item.propertyId !== property.id)),
+          pageProperties([property]),
+        ),
+      ),
+    ]);
+    const byProperty = new Map(tallies.flatMap((tally) => Array.from(tally)));
 
-    // У каждого фасета свои записи (без его фильтра) и свои значения: само
-    // свойство и свойства остальных фильтров — у записей, прошедших привязки
-    const counted = await Promise.all(
-      facetProps.map(async (property) => {
-        const others = filters.filter((item) => item.propertyId !== property.id);
-        const rows = withLinks(loaded.rows, matches, property.id);
-        const values = await this.valuesOf(loaded, rows, [property, ...filteredBy(properties, others)]);
-        const { items } = pageRecords(
-          rows,
-          {
-            page: 1,
-            pageSize: Math.max(rows.length, 1),
-            search: query.search ?? '',
-            searchIn: list.searchIn,
-            sort: null,
-            isDescending: false,
-            isTree: false,
-            filters: others.map((item) => item.filter),
-          },
-          pageProperties(properties),
-          values,
-        );
-        return { property, items, values };
-      }),
-    );
-    const linkNames = await this.linkNamesOf(
-      counted.flatMap(({ property, items, values }) => (isLinkType(property.type) ? linksOf(items, [property], values) : [])),
-      linkProps,
-    );
+    const links = facetProps
+      .filter((property) => isLinkType(property.type))
+      .flatMap((property) => Array.from(byProperty.get(property.id)?.counts.keys() ?? []).map(linkOfKey));
+    const linkNames = await this.linkNamesOf(links);
     return Object.fromEntries(
-      counted.map(({ property, items, values }) => [property.code, facetOf(property, items, values, linkNames)]),
+      facetProps.map((property) => [
+        property.code,
+        facetOf(property, byProperty.get(property.id) ?? { counts: new Map(), min: null, max: null }, linkNames),
+      ]),
     );
+  }
+
+  /** Отбор для `RecordsService`: поиск, фильтр и правила сайта; страница и порядок — у вызывающего. */
+  private selectionOf({ list, properties, domainId }: Loaded, search: string | undefined, filters: ApiFilter[]): Selection {
+    return {
+      page: 1,
+      pageSize: 0,
+      search: search ?? '',
+      searchIn: list.searchIn,
+      filters: filters.map((item) => item.filter),
+      properties: pageProperties(properties),
+      sort: null,
+      isDescending: false,
+      site: { domainId },
+    };
   }
 
   /** Спецификация OpenAPI по нынешним настройкам списков. */
@@ -285,67 +262,26 @@ export class ExternalApiService {
     return properties.filter((property) => property.id !== undefined && !property.isHidden) as ApiPropertyDef[];
   }
 
-  /**
-   * Записи списка для сайта: только активные и хоть раз опубликованные —
-   * запись, заведённую черновиком, на сайте ещё не видно. Значений не читает:
-   * их берут по надобности (`valuesOf`) для домена `domain`.
-   */
+  /** Список для сайта: отдаваемые свойства и домен запроса. */
   private async load(list: ApiList, domain: string | undefined): Promise<Loaded> {
-    const [rows, properties, drafts, domainId] = await Promise.all([
-      this.records.rows(list.listKey),
-      this.propertiesOf(list.listKey),
-      this.drafts.findAll(list.listKey),
-      this.domainIdOf(domain),
-    ]);
-    const unpublished = new Set(drafts.filter((draft) => draft.isNew).map((draft) => draft.recordId));
-    return {
-      list,
-      rows: rows.filter((row) => row.isActive !== false && !unpublished.has(String(row.id))),
-      properties,
-      domain,
-      domainId,
-    };
+    const [properties, domainId] = await Promise.all([this.propertiesOf(list.listKey), this.domainIdOf(domain)]);
+    return { list, properties, domain, domainId };
   }
 
   /**
    * Значения записей `rows` — только свойств `properties`, как их видит API:
-   * мультидоменные — для домена запроса. Записи — всегда часть списка,
-   * поэтому столько же, сколько в списке, — это весь список: его читают без
-   * перечня номеров.
+   * мультидоменные — для домена запроса.
    */
-  private async valuesOf(
-    { list, rows: all, domainId }: Loaded,
-    rows: PageRow[],
-    properties: ApiPropertyDef[],
-  ): Promise<RecordValues> {
-    const recordIds = rows.length === all.length ? null : rows.map((row) => String(row.id));
+  private async valuesOf({ list, domainId }: Loaded, rows: PageRow[], properties: ApiPropertyDef[]): Promise<RecordValues> {
     const stored = await this.values.findSome(
       list.listKey,
-      recordIds,
+      rows.map((row) => String(row.id)),
       properties.map((property) => property.id),
     );
     const byRecord: RecordValues = new Map(
       stored.map((record) => [record.recordId, new Map(record.values.map((item) => [item.propertyId, item.value]))]),
     );
     return apiValues(byRecord, properties, domainId);
-  }
-
-  /**
-   * Фильтры-привязки — в наборы подходящих записей: номер свойства → ключи
-   * записей. Запросом к базе по индексу значений привязки, а не перебором
-   * значений списка. Это сужение, а не весь отбор: мультидоменное значение
-   * чужого домена тоже проходит — точный отбор потом делает `pageRecords`.
-   */
-  private async linkMatches({ list, properties }: Loaded, filters: ApiFilter[]): Promise<Map<number, Set<string>>> {
-    const sets = await Promise.all(
-      filters.flatMap(({ propertyId, linkIds }) => {
-        const property = properties.find((item) => item.id === propertyId);
-        if (!property || linkIds === undefined) return [];
-        const found = this.values.linkedRecordIds(list.listKey, propertyId, linkListOf(property), linkIds);
-        return [found.then((set) => [propertyId, set] as const)];
-      }),
-    );
-    return new Map(sets);
   }
 
   private async domainIdOf(host: string | undefined): Promise<number | null> {
@@ -402,7 +338,7 @@ export class ExternalApiService {
     ) as number[];
     const [files, linkNames, expanded] = await Promise.all([
       this.files.findByIds(fileIds),
-      this.linkNamesOf(linksOf(rows, linkProps, values), linkProps),
+      this.linkNamesOf(linksOf(rows, linkProps, values)),
       this.expandedOf(loaded, rows, values, expand, origin),
     ]);
     return {
@@ -469,7 +405,11 @@ export class ExternalApiService {
     // Других списков здесь не бывает: `parseExpand` пропускает только списки API
     const list = (await this.lists()).find((item) => item.listKey === listKey) as ApiList;
     const loaded = await this.load(list, domain);
-    const rows = loaded.rows.filter((row) => wanted.has(keyOf(row.id)));
+    const ids = Array.from(wanted).flatMap((key) => {
+      const link = linkOfKey(key);
+      return link.listKey === listKey ? [link.recordId] : [];
+    });
+    const rows = await this.records.find(listKey, { ids }, true);
     const values = await this.valuesOf(loaded, rows, loaded.properties);
     const context = await this.contextOf(loaded, rows, values, origin);
     return new Map(rows.map((row) => [keyOf(row.id), this.recordOf(loaded, row, values, context)]));
@@ -477,20 +417,20 @@ export class ExternalApiService {
 
   /**
    * Названия записей, к которым привязаны значения: `список/запись` → название.
-   * Читаются списки-источники привязок `linkProps` и списки из самих `links`.
+   * Читаются только сами привязанные записи — по номерам, списком на список.
    */
-  private async linkNamesOf(links: ContentLink[], linkProps: ApiPropertyDef[]): Promise<Map<string, string | null>> {
-    const lists = Array.from(new Set([...links.map((link) => link.listKey), ...linkProps.map(linkListOf)])).filter(
-      (key) => key !== '',
-    );
+  private async linkNamesOf(links: ContentLink[]): Promise<Map<string, string | null>> {
+    const idsByList = new Map<string, Set<string>>();
+    links.forEach((link) => {
+      if (link.listKey === '') return;
+      idsByList.set(link.listKey, (idsByList.get(link.listKey) ?? new Set()).add(link.recordId));
+    });
     const names = new Map<string, string | null>();
     await Promise.all(
-      lists.map(async (listKey) => {
+      Array.from(idsByList, async ([listKey, ids]) => {
         // Список, которого API не знает (раздел отложен), — без названий, но не ошибка
-        const listRows = await this.records.rows(listKey).catch(() => [] as PageRow[]);
-        listRows.forEach((row) =>
-          names.set(linkKey({ listKey, recordId: String(row.id) }), typeof row.name === 'string' ? row.name : null),
-        );
+        const found = await this.records.names(listKey, Array.from(ids)).catch(() => new Map<string, string | null>());
+        found.forEach((name, recordId) => names.set(linkKey({ listKey, recordId }), name));
       }),
     );
     return names;

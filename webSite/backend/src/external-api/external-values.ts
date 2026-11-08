@@ -1,6 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
 import { CONTENTS_LIST } from '../infoblocks/contents/content-lists';
-import { FilterKind, type PageRow, type RecordFilter, type RecordValues } from '../infoblocks/records/records-page';
+import {
+  domainValue,
+  FilterKind,
+  type RecordFilter,
+  type RecordValues,
+  type ValueTally,
+} from '../infoblocks/records/records-page';
 import {
   externalFileName,
   isExternalUrl,
@@ -8,7 +14,6 @@ import {
   linkKey,
   PropertyType,
   type ContentLink,
-  type DomainGroup,
   type PropertyDef,
 } from '../infoblocks/settings/properties/property';
 
@@ -82,23 +87,8 @@ export const recordIdOf = (recordId: string): number | string =>
 export const linkListOf = (property: PropertyDef): string =>
   property.type === PropertyType.ContentTypeLink ? CONTENTS_LIST : property.linkList;
 
-/**
- * Значение мультидоменного свойства для домена: уникальное значение домена
- * сильнее общего; общее не действует на домены из «кроме». Без домена —
- * общее значение.
- */
-export function domainValue(stored: unknown, domainId: number | null): unknown {
-  if (!Array.isArray(stored)) return stored ?? null;
-  const groups = stored as DomainGroup[];
-  if (domainId !== null) {
-    const own = groups.find((group) => group.domainIds !== null && group.domainIds.includes(domainId));
-    if (own) return own.value;
-  }
-  const common = groups.find((group) => group.domainIds === null);
-  if (!common) return null;
-  if (domainId !== null && (common.exceptDomainIds ?? []).includes(domainId)) return null;
-  return common.value;
-}
+/** Значение мультидоменного свойства для домена — общее правило отбора, `records-page.ts`. */
+export { domainValue };
 
 /**
  * Значения записей так, как их видит API: только отдаваемые свойства,
@@ -180,8 +170,6 @@ export function parseExpand(raw: string | undefined, properties: ApiPropertyDef[
 export interface ApiFilter {
   propertyId: number;
   filter: RecordFilter;
-  /** У привязки — номера выбранных записей: по ним записи сначала отбирают в базе */
-  linkIds?: string[];
 }
 
 /**
@@ -197,10 +185,7 @@ export function parseApiFilters(raw: unknown, properties: ApiPropertyDef[]): Api
   return Object.entries(raw as Record<string, unknown>).map(([code, value]) => {
     const property = properties.find((item) => item.code === code);
     if (!property) throw new BadRequestException(`Нет свойства «${code}»`);
-    const filter = filterOf(property, value);
-    return isLinkType(property.type)
-      ? { propertyId: property.id, filter, linkIds: listOf(property, value) }
-      : { propertyId: property.id, filter };
+    return { propertyId: property.id, filter: filterOf(property, value) };
   });
 }
 
@@ -281,51 +266,39 @@ export interface RangeFacet {
 
 export type ApiFacet = OptionsFacet | LinksFacet | RangeFacet;
 
-/** Фасет свойства по уже отобранным записям. */
-export function facetOf(
-  property: ApiPropertyDef,
-  rows: PageRow[],
-  values: RecordValues,
-  linkNames: Map<string, string | null>,
-): ApiFacet {
-  // Циклом, а не flatMap: у фасета по всему списку записей тысячи
-  const items: unknown[] = [];
-  for (const row of rows) items.push(...itemsOf(values.get(String(row.id))?.get(property.id)));
-
-  if (property.type === PropertyType.Number) {
-    const numbers = items.map(Number).filter((number) => Number.isFinite(number));
-    return {
-      type: 'number',
-      min: numbers.length ? numbers.reduce((a, b) => Math.min(a, b)) : null,
-      max: numbers.length ? numbers.reduce((a, b) => Math.max(a, b)) : null,
-    };
-  }
+/**
+ * Фасет свойства по подсчёту его значений у отобранных записей (`ValueTally`:
+ * его делает база или память). У привязки — записи по убыванию счётчика,
+ * равные — по номеру.
+ */
+export function facetOf(property: ApiPropertyDef, tally: ValueTally, linkNames: Map<string, string | null>): ApiFacet {
+  if (property.type === PropertyType.Number) return { type: 'number', min: tally.min, max: tally.max };
 
   if (property.type === PropertyType.List || property.type === PropertyType.ListOptionLink) {
-    const counts = countOf(items.map(String));
     return {
       type: 'list',
       values: property.options.map((option) => ({
         value: option.code,
         label: option.name,
-        count: counts.get(String(option.id)) ?? 0,
+        count: tally.counts.get(String(option.id)) ?? 0,
       })),
     };
   }
 
-  const links = new Map(items.map((item) => [linkKey(item as ContentLink), item as ContentLink]));
-  const counts = countOf(items.map((item) => linkKey(item as ContentLink)));
   return {
     type: 'content-link',
-    values: Array.from(counts, ([key, count]) => {
-      const link = links.get(key) as ContentLink;
+    values: Array.from(tally.counts, ([key, count]) => {
+      const link = linkOfKey(key);
       return { list: link.listKey, id: recordIdOf(link.recordId), name: linkNames.get(key) ?? null, count };
-    }).sort((a, b) => b.count - a.count),
+    }).sort((a, b) => b.count - a.count || compareIds(a.id, b.id)),
   };
 }
 
-const countOf = (keys: string[]): Map<string, number> => {
-  const counts = new Map<string, number>();
-  keys.forEach((key) => counts.set(key, (counts.get(key) ?? 0) + 1));
-  return counts;
+/** `список/запись` — обратно в привязку: в ключе списка косой черты нет. */
+export const linkOfKey = (key: string): ContentLink => {
+  const slash = key.indexOf('/');
+  return { listKey: key.slice(0, slash), recordId: key.slice(slash + 1) };
 };
+
+const compareIds = (a: number | string, b: number | string): number =>
+  typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b));

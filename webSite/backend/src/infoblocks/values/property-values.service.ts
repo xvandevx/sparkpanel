@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
-import { Op, QueryTypes, Transaction } from 'sequelize';
+import { Op, Transaction } from 'sequelize';
 import { Files } from '../files/files.model';
 import { Domains } from '../domains/domains.model';
 import { HistoryAction } from '../history/history.model';
@@ -167,31 +167,6 @@ export class PropertyValuesService implements OnApplicationBootstrap {
   async findSome(listKey: string, recordIds: string[] | null, propertyIds: number[]): Promise<PropertyValuesDto[]> {
     if (propertyIds.length === 0 || recordIds?.length === 0) return [];
     return this.read(listKey, recordIds, propertyIds);
-  }
-
-  /**
-   * Записи списка, у которых свойство-привязка указывает на одну из записей
-   * `recordIds` списка `linkList`, — запросом по индексу
-   * `infoblock_values_property_link`, без чтения списка. Домены не
-   * разбираются: подходит значение любого домена, точный отбор
-   * мультидоменного свойства — дальше, по его значениям.
-   */
-  async linkedRecordIds(
-    listKey: string,
-    propertyId: number,
-    linkList: string,
-    recordIds: string[],
-  ): Promise<Set<string>> {
-    const settingsId = await this.settingsService.settingsId(resolveInfoblock(listKey).key);
-    if (settingsId === null || recordIds.length === 0) return new Set();
-    const rows = await this.sequelize.query<{ recordKey: string }>(
-      `SELECT DISTINCT r."recordKey"
-       FROM infoblock_values v JOIN infoblock_records r ON r.id = v."recordId"
-       WHERE r."settingsId" = :settingsId AND v."propertyId" = :propertyId
-         AND v.json->>'recordId' IN (:recordIds) AND v.json->>'listKey' = :linkList`,
-      { replacements: { settingsId, propertyId, recordIds, linkList }, type: QueryTypes.SELECT },
-    );
-    return new Set(rows.map((row) => row.recordKey));
   }
 
   /**
