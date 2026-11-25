@@ -422,9 +422,10 @@ export default function ContentEditorDrawer({
       onClose={close}
       // 70% ширины экрана: слева остаётся видна таблица раздела
       size="70%"
+      // Клик по фону — то же закрытие: с правками спросит, без — закроет.
       // Пока запись пишется, шторка заперта: правки после клика в тело запроса
       // уже не попадут, а закрытие развело бы показанное с сохранённым
-      maskClosable={!isChanged && !isSaving}
+      maskClosable={!isSaving}
       closable={!isSaving}
       keyboard={!isSaving}
       title={

@@ -48,8 +48,11 @@ export default function HtmlVisual({
     onUpdate: ({ editor: current }) => onChange(current.isEmpty ? '' : current.getHTML()),
   });
 
+  // Без `false` TipTap на каждый вызов шлёт `update`, как будто текст правили:
+  // пустое поле множественного свойства становилось значением, и карточка,
+  // которую не трогали, считалась изменённой
   useEffect(() => {
-    editor?.setEditable(!isLocked);
+    editor?.setEditable(!isLocked, false);
   }, [editor, isLocked]);
 
   // Значение сменили снаружи (открыли другую запись, сбросили черновик) —

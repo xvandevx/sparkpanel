@@ -118,7 +118,6 @@ export default function ColumnSettings({
       open={open}
       onClose={close}
       size={640}
-      maskClosable={!isChanged}
       title={
         <div className="flex items-center justify-between gap-4">
           <span>Колонки таблицы</span>

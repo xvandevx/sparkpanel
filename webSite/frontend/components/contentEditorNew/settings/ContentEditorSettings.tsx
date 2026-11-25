@@ -189,7 +189,6 @@ export default function ContentEditorSettings({
       onClose={close}
       // 70% ширины экрана: слева остаётся видна таблица раздела
       size="70%"
-      maskClosable={!isChanged}
       title={
         <div className="flex items-center justify-between gap-4">
           <span>Настройки списка</span>
