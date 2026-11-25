@@ -1,5 +1,6 @@
 import { Button, Input, InputNumber, Select, Space, Switch, TreeSelect } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import { CodeField } from './code';
 import { FileField } from './file';
 import { HtmlField } from './html';
 import LinkField from './LinkField';
@@ -117,6 +118,18 @@ function Control({
 
   if (field.type === FieldType.Html) {
     return <HtmlField field={field} value={value} isLocked={isLocked} onChange={onChange} />;
+  }
+
+  if (field.type === FieldType.SourceCode || field.type === FieldType.Json) {
+    return (
+      <CodeField
+        field={field}
+        language={field.type === FieldType.Json ? 'json' : 'javascript'}
+        value={value}
+        isLocked={isLocked}
+        onChange={onChange}
+      />
+    );
   }
 
   if (field.type === FieldType.Table) {

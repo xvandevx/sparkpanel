@@ -47,6 +47,9 @@ function valueSchema(property: ApiPropertyDef, targets: ExpandTargets): Schema {
       return { type: 'number' };
     case PropertyType.Html:
       return { type: 'string', contentMediaType: 'text/html' };
+    // Любое значение JSON — уже разобранное: объект, массив, строка, число
+    case PropertyType.Json:
+      return { description: 'Значение JSON: объект, массив, строка, число, true/false' };
     case PropertyType.List:
     case PropertyType.ListOptionLink:
       return {
@@ -116,6 +119,8 @@ function inputValueSchema(property: ApiPropertyDef): Schema {
       return ref('LinkInput');
     case PropertyType.Table:
       return { type: 'array', items: { type: 'array', items: { type: 'string' } }, description: 'Строки таблицы' };
+    case PropertyType.Json:
+      return { description: 'Значение JSON: объект, массив, число… Строка — JSON-текстом (`"{\\"a\\": 1}"`)' };
     default:
       return { type: 'string' };
   }
@@ -229,6 +234,8 @@ function filterParams(properties: ApiPropertyDef[]): Schema[] {
       case PropertyType.String:
       case PropertyType.Text:
       case PropertyType.Html:
+      case PropertyType.Code:
+      case PropertyType.Json:
         return [query(name, { type: 'string' }, `${property.name}: подстрока`)];
       default:
         return [];

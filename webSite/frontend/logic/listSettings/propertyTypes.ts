@@ -15,6 +15,8 @@ export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
   [PropertyType.Number]: 'Число',
   [PropertyType.Text]: 'Текст',
   [PropertyType.Html]: 'HTML',
+  [PropertyType.Code]: 'Код JavaScript',
+  [PropertyType.Json]: 'JSON',
   [PropertyType.List]: 'Список',
   [PropertyType.File]: 'Файл',
   [PropertyType.Image]: 'Изображение',
@@ -30,6 +32,8 @@ const PROPERTY_TYPE_HINTS: Record<PropertyType, string> = {
   [PropertyType.Number]: 'Число, в том числе дробное',
   [PropertyType.Text]: 'Многострочный текст',
   [PropertyType.Html]: 'Визуальный редактор',
+  [PropertyType.Code]: 'Скрипт как есть — счётчик, виджет, настройки: с подсветкой JavaScript',
+  [PropertyType.Json]: 'Данные в JSON: проверяются и раскладываются по строкам при сохранении',
   [PropertyType.List]: 'Выбор из заданных вариантов',
   [PropertyType.File]: 'Файл из медиатеки или с диска; формат и вес задаются',
   [PropertyType.Image]: 'Картинка; формат, вес и разрешение задаются',
@@ -66,14 +70,20 @@ export const DEFAULT_TABLE_COLUMNS = 3;
 export const supportsMultiple = (type: PropertyType): boolean =>
   type !== PropertyType.Table;
 
-/** Строка, текст и HTML: значение у них — один и тот же текст, между ними переходят без потерь. */
+/**
+ * Строка, текст, HTML и код JavaScript: значение у них — один и тот же текст, между ними
+ * переходят без потерь. JSON — тоже текст, но не любой, поэтому не здесь.
+ */
 export const isTextType = (type: PropertyType): boolean =>
-  type === PropertyType.String || type === PropertyType.Text || type === PropertyType.Html;
+  type === PropertyType.String ||
+  type === PropertyType.Text ||
+  type === PropertyType.Html ||
+  type === PropertyType.Code;
 
 /**
  * Можно ли сменить тип заведённого свойства — то же правило, что у сервера.
  * Пока свойство нигде не заполнено — на любой. Заполненному — только между
- * строкой, текстом и HTML: остальные типы хранят значение по-своему.
+ * строкой, текстом, HTML и кодом JavaScript: остальные типы хранят значение по-своему.
  */
 export const canChangeType = (from: PropertyType, to: PropertyType, isFilled: boolean): boolean =>
   from === to || !isFilled || (isTextType(from) && isTextType(to));

@@ -2,6 +2,7 @@ import { linkKeyOf, linkOf, withId } from '../../../logic/contentLinks';
 import { domainValuesOf, type DomainValue } from '../../../logic/domains';
 import { fileItemsOf, type FileRules } from '../../../logic/files';
 import type { EditorRow } from '../table';
+import { jsonError } from './code/jsonText';
 import { tablePayload, tableRows } from './tableValue';
 
 /**
@@ -37,6 +38,13 @@ export const FieldType = {
   Table: 'table',
   /** Разметка: визуальный редактор и режим «HTML»; значение — строка HTML */
   Html: 'html',
+  /**
+   * Код JavaScript как есть — редактор кода с подсветкой; значение — строка.
+   * Не путать с `Code`: тот — символьный код записи
+   */
+  SourceCode: 'source-code',
+  /** JSON — редактор кода с проверкой; значение — строка JSON-текста */
+  Json: 'json',
 } as const;
 
 export type FieldTypeValue = (typeof FieldType)[keyof typeof FieldType];
@@ -295,6 +303,25 @@ export const draftError = (
     return 'Запись с таким кодом в списке уже есть';
   }
   return null;
+};
+
+/**
+ * Поле «JSON», в котором не JSON: сервер такое не сохранит — говорим до
+ * «Сохранить», с номером строки. Проверяет и поля записи, и свойства.
+ */
+export const jsonFieldsError = (draft: RecordDraft, fields: EditorFields): string | null => {
+  for (const [key, field] of Object.entries(fields)) {
+    if (field.type !== FieldType.Json) continue;
+    const error = textsOf(field, draft[key]).map(jsonError).find((text) => text !== null);
+    if (error) return `Поле «${field.name}»: ${error}`;
+  }
+  return null;
+};
+
+/** Все строки значения поля: у мультидоменного — по доменам, у множественного — каждая. */
+const textsOf = (field: EditorField, value: unknown): string[] => {
+  const values = field.isMultiDomain === true ? ((value as DomainValue[] | undefined) ?? []).map((row) => row.value) : [value];
+  return values.flatMap((item) => (Array.isArray(item) ? item : [item])).map((item) => String(item ?? ''));
 };
 
 /** Значения нет: пустое поле, пустой список (и таблица из пустых ячеек) или ничего. */

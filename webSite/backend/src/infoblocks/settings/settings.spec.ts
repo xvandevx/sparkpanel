@@ -213,8 +213,11 @@ describe('canChangeType', () => {
     expect(canChangeType(PropertyType.List, PropertyType.Table, false)).toBe(true);
   });
 
-  it('заполненному — только между строкой, текстом и HTML', () => {
+  it('заполненному — только между строкой, текстом, HTML и кодом', () => {
     expect(canChangeType(PropertyType.String, PropertyType.Html, true)).toBe(true);
+    expect(canChangeType(PropertyType.Html, PropertyType.Code, true)).toBe(true);
+    // Прежний текст мог JSON-ом и не быть
+    expect(canChangeType(PropertyType.Text, PropertyType.Json, true)).toBe(false);
     expect(canChangeType(PropertyType.Html, PropertyType.Text, true)).toBe(true);
     expect(canChangeType(PropertyType.String, PropertyType.Number, true)).toBe(false);
     expect(canChangeType(PropertyType.File, PropertyType.Image, true)).toBe(false);
@@ -310,6 +313,24 @@ describe('normalizeValues', () => {
     expect(errors).toEqual([]);
     // Свойство стало одиночным — из сохранённого массива берётся первое значение
     expect(values).toEqual({ cover: 7 });
+  });
+
+  it('JSON проверяет и раскладывает по строкам, код хранит как есть', () => {
+    const json = property({ code: 'data', name: 'Данные', type: PropertyType.Json });
+    const code = property({ code: 'counter', name: 'Счётчик', type: PropertyType.Code });
+
+    const saved = normalizeValues([json, code], { data: '{"a":1,"b":[true,null]}', counter: '  <script>x()</script>\n' }, true);
+    expect(saved.errors).toEqual([]);
+    expect(saved.values).toEqual({
+      data: '{\n  "a": 1,\n  "b": [\n    true,\n    null\n  ]\n}',
+      counter: '  <script>x()</script>\n',
+    });
+
+    expect(normalizeValues([json], { data: "{a: 1}" }, true).errors).toEqual([
+      'Свойство «Данные»: это не JSON — проверьте скобки, кавычки и запятые',
+    ]);
+    // JSON — только текстом: объект приводит к тексту внешнее API, а не сохранение
+    expect(normalizeValues([json], { data: { a: 1 } }, true).errors).toHaveLength(1);
   });
 });
 

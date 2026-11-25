@@ -20,7 +20,7 @@ import styles from './HtmlVisual.module.css';
 // Оба редактора работают только в браузере: на сервере Next их не выполнить
 const loading = () => <Spin size="small" />;
 const HtmlVisual = dynamic(() => import('./HtmlVisual'), { ssr: false, loading });
-const HtmlCode = dynamic(() => import('./HtmlCode'), { ssr: false, loading });
+const CodeEditor = dynamic(() => import('../code/CodeEditor'), { ssr: false, loading });
 
 /** «Рядом» — код и результат бок о бок, есть только на весь экран; в карточке это «HTML». */
 type Mode = 'visual' | 'code' | 'split';
@@ -140,7 +140,7 @@ export default function HtmlField({
       return <HtmlVisual field={field} value={html} isLocked={isLocked} extra={toolsExtra} onChange={onChange} />;
     }
     const code = (
-      <HtmlCode value={html} isLocked={isLocked} isFullHeight={isFullscreen} onChange={onChange} onFormat={format} />
+      <CodeEditor value={html} language="html" isLocked={isLocked} isFullHeight={isFullscreen} onChange={onChange} onFormat={format} />
     );
     if (!isFullscreen) {
       return (

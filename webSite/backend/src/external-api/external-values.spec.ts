@@ -69,6 +69,10 @@ describe('domainValue', () => {
 
 describe('apiValue', () => {
   it('«Список» — кодом варианта', () => expect(apiValue(brand, 11, context)).toBe('thule'));
+  it('JSON — разобранным, а не текстом', () => {
+    const data = property({ id: 8, code: 'data', type: PropertyType.Json });
+    expect(apiValue(data, '{\n  "a": [1, true]\n}', context)).toEqual({ a: [1, true] });
+  });
   it('изображение — файлом с адресом', () => expect(apiValue(photo, 41, context)).toMatchObject({ id: 41, url: 'http://site/uploads/41.jpg' }));
   it('внешнее изображение — той же формой, без номера', () =>
     expect(apiValue(photo, 'https://old.site/upload/logo.png', context)).toEqual({

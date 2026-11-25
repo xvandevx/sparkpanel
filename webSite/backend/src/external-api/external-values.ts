@@ -113,6 +113,16 @@ export function apiValues(stored: RecordValues, properties: ApiPropertyDef[], do
 export const itemsOf = (value: unknown): unknown[] =>
   value === null || value === undefined || value === '' ? [] : Array.isArray(value) ? value : [value];
 
+/** Текст JSON — разобранным; не разобрался (сохранён до смены типа) — как есть. */
+const parsedJson = (item: unknown): unknown => {
+  if (typeof item !== 'string') return item;
+  try {
+    return JSON.parse(item);
+  } catch {
+    return item;
+  }
+};
+
 /**
  * Значение свойства в ответе. Пустое — `null`, у множественного — `[]`:
  * ключ свойства в `properties` есть всегда, сайту не нужно проверять, есть ли он.
@@ -138,6 +148,9 @@ export function apiValue(property: ApiPropertyDef, value: unknown, context: Valu
           name: context.linkNames.get(linkKey(link)) ?? null,
         } satisfies ApiLink;
       }
+      // Хранится текстом — сайту отдаём разобранным: ему нужны данные, а не строка
+      case PropertyType.Json:
+        return parsedJson(item);
       default:
         return item;
     }
@@ -219,6 +232,8 @@ function filterOf(property: ApiPropertyDef, value: unknown): RecordFilter {
     case PropertyType.String:
     case PropertyType.Text:
     case PropertyType.Html:
+    case PropertyType.Code:
+    case PropertyType.Json:
       if (typeof value !== 'string') throw new BadRequestException(`У «${property.code}» фильтр — строка`);
       return { key, kind: FilterKind.Text, text: value };
     default:

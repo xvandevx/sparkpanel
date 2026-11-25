@@ -22,6 +22,8 @@ const EDITABLE: Record<string, FieldTypeValueOf> = {
   [PropertyType.Number]: FieldType.Number,
   [PropertyType.Text]: FieldType.Text,
   [PropertyType.Html]: FieldType.Html,
+  [PropertyType.Code]: FieldType.SourceCode,
+  [PropertyType.Json]: FieldType.Json,
   [PropertyType.List]: FieldType.List,
   // Варианты у привязки — того «Списка», на который она смотрит: их подставил сервер
   [PropertyType.ListOptionLink]: FieldType.List,

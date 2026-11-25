@@ -85,6 +85,10 @@ async function oneValue(property: WriteProperty, item: unknown, resolve: LinkRes
       // из чтения тоже подходит: у своего берётся номер, у внешнего — адрес
       if (!isObject(item)) return item;
       return item.id !== undefined && item.id !== null ? item.id : item.url;
+    // Объект, массив, число — сам JSON: в маршрут панели он уходит текстом.
+    // Строка — уже JSON-текст, её проверит сохранение
+    case PropertyType.Json:
+      return typeof item === 'string' ? item : JSON.stringify(item);
     default:
       return item;
   }

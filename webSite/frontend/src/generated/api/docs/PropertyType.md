@@ -17,6 +17,10 @@
 
 * `Html` (value: `'html'`)
 
+* `Code` (value: `'code'`)
+
+* `Json` (value: `'json'`)
+
 * `ContentLink` (value: `'content-link'`)
 
 * `ContentTypeLink` (value: `'content-type-link'`)

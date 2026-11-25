@@ -43,6 +43,8 @@ const KIND_OF_TYPE: Record<string, FilterKind> = {
   [PropertyType.String]: FilterKind.Text,
   [PropertyType.Text]: FilterKind.Text,
   [PropertyType.Html]: FilterKind.Text,
+  [PropertyType.Code]: FilterKind.Text,
+  [PropertyType.Json]: FilterKind.Text,
   [PropertyType.Number]: FilterKind.Range,
 };
 

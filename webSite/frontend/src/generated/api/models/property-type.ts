@@ -28,6 +28,8 @@ export enum PropertyType {
     List = 'list',
     Text = 'text',
     Html = 'html',
+    Code = 'code',
+    Json = 'json',
     ContentLink = 'content-link',
     ContentTypeLink = 'content-type-link',
     ListOptionLink = 'list-option-link',

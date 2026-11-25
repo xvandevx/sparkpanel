@@ -47,6 +47,8 @@ const FORMATS: Record<PropertyType, string> = {
   [PropertyType.String]: 'строка',
   [PropertyType.Text]: 'строка, можно в несколько строк',
   [PropertyType.Html]: 'строка с HTML-разметкой',
+  [PropertyType.Code]: 'строка с кодом JavaScript, как есть',
+  [PropertyType.Json]: 'строка с JSON-текстом: "{\\"a\\": 1}"; при сохранении проверяется и раскладывается по строкам',
   [PropertyType.Number]: 'число',
   [PropertyType.File]:
     'номер файла — из upload_file или find_records по списку files.N — или адрес внешнего файла "https://…" (не скачивается)',

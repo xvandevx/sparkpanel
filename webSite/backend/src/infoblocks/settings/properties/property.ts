@@ -22,6 +22,13 @@ export enum PropertyType {
   Text = 'text',
   /** HTML-разметка из визуального редактора */
   Html = 'html',
+  /** Код JavaScript как есть — счётчик, виджет: правится редактором кода, хранится текстом */
+  Code = 'code',
+  /**
+   * JSON: при сохранении проверяется и раскладывается по строкам (отступ — 2 пробела),
+   * хранится этим текстом; внешнее API отдаёт его разобранным
+   */
+  Json = 'json',
   /**
    * Привязка к записям контента: страница, элемент типа контента, роль,
    * категория, форма. Сами типы контента сюда не входят — для них свой тип
@@ -56,19 +63,21 @@ export const supportsMultiple = (type: PropertyType): boolean =>
   type !== PropertyType.Table;
 
 /**
- * Типы с одним и тем же значением — текстом в колонке `text`: строка, текст
- * и HTML. Между ними тип меняется и у заполненного свойства — значения
- * читаются новым типом как есть.
+ * Типы с одним и тем же значением — текстом в колонке `text`: строка, текст,
+ * HTML и код. Между ними тип меняется и у заполненного свойства — значения
+ * читаются новым типом как есть. JSON тоже текст, но не любой: прежний текст
+ * JSON-ом мог и не быть, поэтому в него — только у незаполненного.
  */
 const TEXT_TYPES: ReadonlySet<PropertyType> = new Set([
   PropertyType.String,
   PropertyType.Text,
   PropertyType.Html,
+  PropertyType.Code,
 ]);
 
 /**
  * Можно ли сменить тип свойства. Пока ни у одной записи нет его значения —
- * на любой: терять нечего. Заполненному — только внутри строки, текста и HTML:
+ * на любой: терять нечего. Заполненному — только внутри строки, текста, HTML и кода:
  * остальные типы хранят значение по-своему («12 шт.» числом не станет).
  */
 export const canChangeType = (from: PropertyType, to: PropertyType, isFilled: boolean): boolean =>
@@ -347,7 +356,13 @@ export function normalizeValues(
     const value = normalizeValue(property, raw);
 
     if (value === INVALID) {
-      if (strict) errors.push(`Неверное значение свойства «${property.name}»`);
+      if (strict) {
+        errors.push(
+          property.type === PropertyType.Json
+            ? `Свойство «${property.name}»: это не JSON — проверьте скобки, кавычки и запятые`
+            : `Неверное значение свойства «${property.name}»`,
+        );
+      }
       continue;
     }
     if (value === null) {
@@ -526,9 +541,15 @@ function normalizeValue(property: PropertyDef, raw: unknown): Normalized {
 
     case PropertyType.Text:
     case PropertyType.Html:
+    case PropertyType.Code:
       // Повторы тут не схлопываем: два одинаковых абзаца — это два абзаца,
       // а не случайно выбранный дважды вариант
       return normalizeMany(property, raw, (item) => (typeof item === 'string' ? item : INVALID), false);
+
+    // JSON приходит текстом и хранится текстом — но разобранным и разложенным
+    // по строкам: так его удобно читать в карточке, а не-JSON не сохранится
+    case PropertyType.Json:
+      return normalizeMany(property, raw, toJsonText, false);
 
     case PropertyType.Number:
       return normalizeMany(property, raw, toNumber, false);
@@ -648,6 +669,19 @@ function normalizeMany(
   if (list.length === 0) return null;
   return property.multiple ? list : list[0];
 }
+
+/**
+ * Текст JSON — проверенным и разложенным по строкам с отступом в 2 пробела.
+ * Не строка или не JSON — неверное значение.
+ */
+const toJsonText = (item: unknown): Normalized => {
+  if (typeof item !== 'string') return INVALID;
+  try {
+    return JSON.stringify(JSON.parse(item), null, 2);
+  } catch {
+    return INVALID;
+  }
+};
 
 const toTrimmedString = (raw: unknown): Normalized =>
   typeof raw === 'string' || typeof raw === 'number' ? String(raw).trim() : INVALID;

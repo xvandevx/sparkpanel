@@ -256,15 +256,16 @@ components/contentEditorNew/
                           LinkField — поле обеих привязок (к записям
                           и к типу контента), TableField — поле «Таблица»,
                           tableValue.ts — строки таблицы и тело запроса,
-                          FieldFullscreen — окно «на весь экран» у «HTML» и «Таблицы»,
+                          FieldFullscreen — окно «на весь экран» у «HTML», «Таблицы», «JavaScript» и «JSON»,
                           useRecord.ts — сохранить и удалить запись и её значения
     file/                 FileField — поле «Файл»/«Изображение», FilePickerDrawer — выбор
                           из загруженных поверх карточки, ExternalFileRow — внешний файл
                           (адрес) в поле, FileUrlInput — ввод адреса: «Вставить / Заменить ссылку»
+    code/                 CodeEditor — CodeMirror (HTML, JavaScript или JSON), им же правит режим «HTML»;
+                          CodeField — поля «Код JavaScript» и «JSON»; jsonText.ts — проверка и раскладка JSON
     html/                 HtmlField — поле «HTML»: переключатель «Визуально / HTML»;
                           HtmlVisual — TipTap, HtmlToolbar и Tool — его кнопки,
                           HtmlImageButton — картинка с диска или из загруженных;
-                          HtmlCode — CodeMirror;
                           HtmlPreview — результат в режиме «Рядом»; htmlMarkup.ts — что
                           визуальный режим не сохранит
   drafts/                 черновики (если включены в настройках списка): useDrafts — сохранить,
@@ -371,6 +372,13 @@ TipTap выбросил бы чужие теги и атрибуты. В «HTML�
 «Изображение», — через свойство (`field.upload`, только изображения); выбрать можно
 и из загруженных (`FilePickerDrawer`). Рамка и подложка — токены темы через CSS-переменные
 (`HtmlVisual.module.css`), своих цветов нет.
+
+**«Код JavaScript» и «JSON» — поле `CodeField` (`FieldType.SourceCode`, `FieldType.Json`, `drawer/code/`)**:
+тот же `CodeEditor` (CodeMirror), что у режима «HTML», и то же окно «на весь экран».
+Код JavaScript хранится как набрали, с подсветкой JavaScript (`@codemirror/lang-javascript`). «JSON» проверяется
+на ходу (`jsonText.ts`): ошибка с номером строки под полем, а `jsonFieldsError` (`record.ts`)
+закрывает «Сохранить»; «Отформатировать» — Shift+Alt+F. Разложить по строкам при сохранении —
+дело сервера. `FieldType.Code` — это символьный код записи, не путать.
 
 **«Таблица» — поле `TableField` (`FieldType.Table`)**: сетка antd `Table` с полем ввода
 в каждой ячейке. Столбцы и заголовки — из настроек свойства (`field.table`), шапка

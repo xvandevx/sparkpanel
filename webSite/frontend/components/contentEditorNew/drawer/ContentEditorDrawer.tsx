@@ -27,6 +27,7 @@ import {
   changedValues,
   draftError,
   draftOf,
+  jsonFieldsError,
   parentOptions,
   payloadOf,
   standardFields,
@@ -259,14 +260,16 @@ export default function ContentEditorDrawer({
     (JSON.stringify(draft) !== JSON.stringify(draftOf(shownRecord, cardOf)) ||
       (values !== null && JSON.stringify(values) !== JSON.stringify(draftOf(shownValues, propertyFields))));
 
+  // Поля записи — обязательные и код; свойства — только JSON: их обязательность
+  // проверяет сервер
   const error =
     draft === null
       ? null
-      : draftError(draft, cardOf, {
+      : (draftError(draft, cardOf, {
           rows,
           id: record === null || isNew(record) ? null : record.id,
           isCodeUnique: rules.codeUnique,
-        });
+        }) ?? (values === null ? null : jsonFieldsError(values, propertyFields)));
 
   /**
    * Закрыть с несохранёнными правками спрашиваем: набранное пропадёт.
