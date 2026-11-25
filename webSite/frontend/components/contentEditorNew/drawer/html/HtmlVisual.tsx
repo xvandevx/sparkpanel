@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
@@ -32,11 +32,14 @@ export default function HtmlVisual({
   field,
   value,
   isLocked,
+  extra,
   onChange,
 }: {
   field: EditorField;
   value: string;
   isLocked: boolean;
+  /** Кнопки поля в правом краю панели: режим, «на весь экран» */
+  extra?: ReactNode;
   onChange: (value: string) => void;
 }) {
   const editor = useEditor({
@@ -65,7 +68,13 @@ export default function HtmlVisual({
 
   return (
     <>
-      {editor && !isLocked && <HtmlToolbar editor={editor} field={field} />}
+      {/* Закрытое поле кнопок правки не показывает, а режим и «на весь экран» — да */}
+      {editor &&
+        (isLocked ? (
+          extra && <div className={styles.toolbar}>{extra}</div>
+        ) : (
+          <HtmlToolbar editor={editor} field={field} extra={extra} />
+        ))}
       <EditorContent editor={editor} className={styles.content} />
     </>
   );

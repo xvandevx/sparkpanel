@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { App, Button, Segmented, Space, Spin, Splitter, Typography, theme } from 'antd';
 import {
@@ -14,6 +14,7 @@ import type { EditorField } from '../record';
 import { unsupportedMarkup } from './htmlMarkup';
 import HtmlFullscreen from './HtmlFullscreen';
 import HtmlPreview from './HtmlPreview';
+import Tool from './Tool';
 import styles from './HtmlVisual.module.css';
 
 // Оба редактора работают только в браузере: на сервере Next их не выполнить
@@ -123,14 +124,33 @@ export default function HtmlField({
     </Button>
   );
 
-  const editor = () => {
+  // Режим, «Отформатировать» и «на весь экран» — в правом краю панели кнопок
+  // самого редактора, а не строкой над полем: так поле — одна рамка
+  const extra = (
+    <span className={styles.extra}>
+      {formatButton}
+      {modeSwitch}
+      <Tool title="На весь экран" icon={<FullscreenOutlined />} onClick={() => setFullscreen(true)} />
+    </span>
+  );
+
+  /** Сам редактор; `toolsExtra` — кнопки поля в его панели (в карточке, не в окне). */
+  const editor = (toolsExtra?: ReactNode) => {
     if (mode === 'visual') {
-      return <HtmlVisual field={field} value={html} isLocked={isLocked} onChange={onChange} />;
+      return <HtmlVisual field={field} value={html} isLocked={isLocked} extra={toolsExtra} onChange={onChange} />;
     }
     const code = (
       <HtmlCode value={html} isLocked={isLocked} isFullHeight={isFullscreen} onChange={onChange} onFormat={format} />
     );
-    if (!isFullscreen || mode === 'code') return code;
+    if (!isFullscreen) {
+      return (
+        <>
+          {toolsExtra && <div className={styles.toolbar}>{toolsExtra}</div>}
+          {code}
+        </>
+      );
+    }
+    if (mode === 'code') return code;
     return (
       <Splitter>
         <Splitter.Panel min="25%">{code}</Splitter.Panel>
@@ -142,26 +162,13 @@ export default function HtmlField({
   };
 
   return (
-    <Space orientation="vertical" size={6} style={{ display: 'flex' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        {!isFullscreen && modeSwitch}
-        <Space size={6} style={{ marginLeft: 'auto' }}>
-          {!isFullscreen && formatButton}
-          <Button
-            size="small"
-            icon={<FullscreenOutlined />}
-            title="На весь экран"
-            aria-label="На весь экран"
-            onClick={() => setFullscreen(true)}
-          />
-        </Space>
-      </div>
+    <>
       {isFullscreen ? (
         // Редактор один: пока открыто окно, в карточке его нет
         <Typography.Text type="secondary">Открыто на весь экран</Typography.Text>
       ) : (
         <div className={styles.frame} style={frameStyle}>
-          {editor()}
+          {editor(extra)}
         </div>
       )}
       {isFullscreen && (
@@ -185,6 +192,6 @@ export default function HtmlField({
           </div>
         </HtmlFullscreen>
       )}
-    </Space>
+    </>
   );
 }

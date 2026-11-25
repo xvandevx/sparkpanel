@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Button, Dropdown, Input, Popover, Space } from 'antd';
 import {
   BoldOutlined,
@@ -22,9 +22,18 @@ import styles from './HtmlVisual.module.css';
 /**
  * Кнопки визуального режима: начертание, заголовки, списки, цитата, ссылка,
  * изображение, таблица, отмена. Нажатая кнопка подсвечена — видно, что уже
- * стоит под курсором.
+ * стоит под курсором. `extra` — кнопки самого поля (режим, «на весь экран»),
+ * прижаты вправо.
  */
-export default function HtmlToolbar({ editor, field }: { editor: Editor; field: EditorField }) {
+export default function HtmlToolbar({
+  editor,
+  field,
+  extra,
+}: {
+  editor: Editor;
+  field: EditorField;
+  extra?: ReactNode;
+}) {
   // Что стоит под курсором — перечитывается на каждую правку и сдвиг курсора
   const state = useEditorState({
     editor,
@@ -90,6 +99,7 @@ export default function HtmlToolbar({ editor, field }: { editor: Editor; field: 
       />
       <Tool title="Отменить" icon={<UndoOutlined />} isDisabled={!state.canUndo} onClick={() => chain().undo().run()} />
       <Tool title="Повторить" icon={<RedoOutlined />} isDisabled={!state.canRedo} onClick={() => chain().redo().run()} />
+      {extra}
     </div>
   );
 }
