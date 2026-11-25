@@ -12,7 +12,7 @@ import {
 import { formatHtml } from '../../../../logic/htmlFormat';
 import type { EditorField } from '../record';
 import { unsupportedMarkup } from './htmlMarkup';
-import HtmlFullscreen from './HtmlFullscreen';
+import FieldFullscreen from '../FieldFullscreen';
 import HtmlPreview from './HtmlPreview';
 import Tool from './Tool';
 import styles from './HtmlVisual.module.css';
@@ -172,7 +172,7 @@ export default function HtmlField({
         </div>
       )}
       {isFullscreen && (
-        <HtmlFullscreen
+        <FieldFullscreen
           title={field.name}
           onClose={() => setFullscreen(false)}
           header={
@@ -190,7 +190,7 @@ export default function HtmlField({
           <div className={`${styles.frame} ${styles.full}`} style={frameStyle}>
             {editor()}
           </div>
-        </HtmlFullscreen>
+        </FieldFullscreen>
       )}
     </>
   );
